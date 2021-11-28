@@ -1,12 +1,12 @@
 import struct
 
 class StringPiece:
-  def __init__(self, data, offset=0, size=None):
+  def __init__(self, data, size=None, offset=0):
     self._data = data
-    self._offset = offset
     if size is None:
       size = len(data)
     self._size = size
+    self._offset = offset
 
   @property
   def data(self):
@@ -38,10 +38,6 @@ class RandomAccessFile:
     return StringPiece(data)
 
 
-def decode_fixed_64(buffer, offset=0):
-  return struct.unpack_from('Q', buffer, offset=offset)[0]
-
-
 def get_varint_64(input: StringPiece):
   result = 0
   p = input.data
@@ -59,7 +55,9 @@ def get_varint_64(input: StringPiece):
   return False, None
 
       
+def decode_fixed_64(buffer, offset=0):
+  return struct.unpack_from('<Q', buffer, offset=offset)[0]
 
 
-
-
+def decode_fixed_32(buffer, offset=0):
+  return struct.unpack_from('<L', buffer, offset=offset)[0]

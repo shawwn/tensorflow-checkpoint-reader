@@ -11,4 +11,5 @@ class BundleReader:
     file_size = os.path.getsize(filename)
     self._metadata = core.RandomAccessFile(open(filename, 'rb'))
     self._table = table.Table.open(self._metadata, file_size)
+    breakpoint()
 
