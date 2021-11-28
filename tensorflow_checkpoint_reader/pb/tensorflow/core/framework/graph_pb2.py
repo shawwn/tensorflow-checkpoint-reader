@@ -11,9 +11,9 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
-from tensorflow.core.framework import function_pb2 as tensorflow_dot_core_dot_framework_dot_function__pb2
-from tensorflow.core.framework import node_def_pb2 as tensorflow_dot_core_dot_framework_dot_node__def__pb2
-from tensorflow.core.framework import versions_pb2 as tensorflow_dot_core_dot_framework_dot_versions__pb2
+from . import function_pb2 as tensorflow_dot_core_dot_framework_dot_function__pb2
+from . import node_def_pb2 as tensorflow_dot_core_dot_framework_dot_node__def__pb2
+from . import versions_pb2 as tensorflow_dot_core_dot_framework_dot_versions__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
