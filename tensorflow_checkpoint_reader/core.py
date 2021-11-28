@@ -1,7 +1,9 @@
 import struct
 
 class StringPiece:
-  def __init__(self, data, size=None, offset=0):
+  def __init__(self, data=None, size=None, offset=0):
+    if data is None:
+      data = b''
     self._data = data
     if size is None:
       size = len(data)
