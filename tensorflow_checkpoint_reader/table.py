@@ -215,7 +215,7 @@ class Block:
         return False
       # Decode next entry
       p, shared, non_shared, value_length = decode_entry(self._data, p, limit)
-      breakpoint()
+      # breakpoint()
       if p is None:
         self.corruption_error()
         return False
@@ -224,8 +224,10 @@ class Block:
         return False
       else:
         # key_.resize(shared);
-        while len(self._key) < shared:
-          self._key += b' '
+        if len(self._key) < shared:
+          self._key = b' ' * shared
+        elif len(self._key) > shared:
+          self._key = self._key[0:shared]
         # key_.append(p, non_shared)
         self._key += self._data[p:p + non_shared]
         self._value = core.StringPiece(self._data, value_length, p + non_shared)
