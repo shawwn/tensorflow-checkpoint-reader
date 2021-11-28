@@ -12,16 +12,20 @@ class StringPiece:
 
   @property
   def data(self):
-    return self._data[self._offset:self._size]
+    return self._data[self._offset:self._offset + self._size]
 
   @property
   def size(self):
     return self._size
 
+  @property
+  def offset(self):
+    return self._offset
+
   def set(self, other):
     self._data = other._data
-    self._offset = other._offset
     self._size = other._size
+    self._offset = other._offset
 
   def advance(self, n):
     if n > self._size:
@@ -56,7 +60,33 @@ def get_varint_64(input: StringPiece):
       return True, result
   return False, None
 
-      
+
+def get_varint_32_ptr(data: bytes, p: int, limit: int):
+  if p < limit:
+    result = data[p]
+    if (result & 128) == 0:
+      value = result
+      return p + 1, value
+  return get_varint_32_ptr_fallback(data, p, limit)
+
+
+def get_varint_32_ptr_fallback(data: bytes, p: int, limit: int):
+  result = 0
+  for shift in range(0, 29, 7):
+    if p >= limit:
+      break
+    byte = data[p]
+    p += 1
+    if byte & 128:
+      # More bytes are present
+      result |= (byte & 127) << shift
+    else:
+      result |= byte << shift
+      value = result
+      return p, value
+  return None, None
+
+
 def decode_fixed_64(buffer, offset=0):
   return struct.unpack_from('<Q', buffer, offset=offset)[0]
 
