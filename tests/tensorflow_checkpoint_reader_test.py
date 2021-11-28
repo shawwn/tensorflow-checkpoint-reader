@@ -1,0 +1,2 @@
+import unittest
+from tensorflow_checkpoint_reader.pb.tensorflow.core.protobuf import tensor_bundle_pb2
