@@ -191,16 +191,6 @@ def string_view(data = None, length: int = None, offset: int = None) -> StringPi
   return StringPiece(data, length, offset)
 
 
-class RandomAccessFile:
-  def __init__(self, fp):
-    self._fp = fp
-
-  def read(self, offset, length):
-    self._fp.seek(offset)
-    data = self._fp.read(length)
-    return StringPiece(data)
-
-
 def get_varint_64(input: StringPiece):
   result = 0
   p = input.slice()

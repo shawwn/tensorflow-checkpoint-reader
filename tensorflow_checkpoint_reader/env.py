@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Callable, List, Optional, Dict, NamedTuple
+from typing import Callable, List, Optional, Dict, NamedTuple, Tuple
 from functools import wraps as _wraps
 import threading as _threading
 import os as _os
@@ -7,10 +7,13 @@ import os as _os
 from . import file_system
 from . import errors
 from . import misc
+from . import core
+from . import io
 from . import env_time
 from . import port
 from . import strings
 from . import platform
+from . import posix_file_system
 
 _name_mutex = _threading.RLock()
 
@@ -69,21 +72,40 @@ class Env(ABC):
     The result of Default() belongs to this library and must never be deleted."""
     return misc.putattr(cls, '_default_env', WindowsEnv if platform.is_windows_platform() else PosixEnv)
 
-  def get_file_system_for_file(self, fname: str) -> (errors.Status, Optional[file_system.FileSystem]):
+  def get_file_system_for_file(self, fname: str) -> Tuple[errors.Status, file_system.FileSystem]:
     """Returns the FileSystem object to handle operations on the file
     specified by 'fname'. The FileSystem object is used as the implementa
     for the file system related (non-virtual) functions that follow.
     Returned FileSystem object is still owned by the Env object and will
     (might) be destroyed when the environment is destroyed."""
-    raise NotImplementedError()
+    scheme, host, path = io.parse_uri(fname)
+    file_system = self._file_system_registry.lookup(bytes(scheme))
+    if file_system is None:
+      if scheme.empty():
+        scheme = core.string_view(b"[local]")
+      return errors.Unimplemented("File system scheme '", scheme,
+                                  "' not implemented (file: '", fname, "')"), None
+    return errors.Status.OK(), file_system
+
+  def get_file_size(self, fname) -> Tuple[errors.Status, int]:
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err, 0
+    return fs.get_file_size(fname)
+
+  def new_random_access_file(self, fname) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err, None
+    return fs.new_random_access_file(fname)
 
   def get_registered_file_system_schemes(self, schemes: List[str]) -> errors.Status:
     """Returns the file system schemes registered for this Env."""
-    raise NotImplementedError()
+    return self._file_system_registry.get_registered_file_system_schemes(schemes)
 
   def register_file_system_factory(self, scheme: str, factory: file_system.FileSystemRegistry.Factory):
     """Register a file system for a scheme."""
-    raise NotImplementedError()
+    return self._file_system_registry.register_factory(scheme, factory)
 
   def register_file_system(self, scheme: str, file_system: file_system.FileSystem):
     """Register a modular file system for a scheme.
@@ -92,7 +114,7 @@ class Env(ABC):
 
     TODO(mihaimaruseac): After all filesystems are converted, make this be the
     canonical registration function."""
-    raise NotImplementedError()
+    return self._file_system_registry.register_filesystem(scheme, file_system)
 
   def now_nanos(self) -> int:
     """Returns the number of nano-seconds since the Unix epoch."""
@@ -182,38 +204,44 @@ class WindowsEnv(Env, ABC):
   pass
 
 class FileSystemRegistryImpl(file_system.FileSystemRegistry):
-  _registry: Dict[str, file_system.FileSystem]
+  _registry: Dict[bytes, file_system.FileSystem]
 
   def __init__(self):
     self._mu = _threading.RLock()
     self._registry = dict()
 
-  def register_factory(self, scheme: str, factory: file_system.FileSystemRegistry.Factory) -> errors.Status:
+  def register_factory(self, scheme, factory: file_system.FileSystemRegistry.Factory) -> errors.Status:
     with self._mu:
+      scheme = bytes(core.string_view(scheme))
       if scheme in self._registry:
         return errors.AlreadyExists("File factory for ", scheme,
                                     " already registered")
       self._registry[scheme] = factory()
       return errors.Status.OK()
 
-  def register_filesystem(self, scheme: str, filesystem: file_system.FileSystem) -> errors.Status:
+  def register_filesystem(self, scheme, filesystem: file_system.FileSystem) -> errors.Status:
     with self._mu:
+      scheme = bytes(core.string_view(scheme))
       if scheme in self._registry:
         return errors.AlreadyExists("File factory for ", scheme,
                                     " already registered")
       self._registry[scheme] = filesystem
       return errors.Status.OK()
 
-  def lookup(self, scheme: str) -> Optional[file_system.FileSystem]:
+  def lookup(self, scheme) -> Optional[file_system.FileSystem]:
     with self._mu:
+      scheme = bytes(core.string_view(scheme))
       if scheme in self._registry:
         return self._registry[scheme]
 
-  def get_registered_file_system_schemes(self, schemes: List[str]) -> errors.Status:
+  def get_registered_file_system_schemes(self, schemes: List[bytes]) -> errors.Status:
     with self._mu:
       for e in self._registry.keys():
         schemes.append(e)
       return errors.Status.OK()
+
+
+Env.default().register_file_system_factory("", posix_file_system.PosixFileSystem)
 
 def getenv(name: str) -> str:
   return _os.getenv(str(name))

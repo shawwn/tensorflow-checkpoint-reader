@@ -9,6 +9,38 @@ from . import core
 from . import io
 from . import file_statistics
 
+
+class RandomAccessFile(ABC):
+  """A file abstraction for randomly reading the contents of a file."""
+
+  def name(self) -> (errors.Status, core.StringPiece):
+    """Returns the name of the file.
+
+    This is an optional operation that may not be implemented by every
+    filesystem."""
+    return errors.Unimplemented("This filesystem does not support name()")
+
+  @abstractmethod
+  def close(self) -> errors.Status:
+    return errors.Unimplemented("This filesystem does not support close()")
+
+  @abstractmethod
+  def read(self, offset: int, n: int) -> (errors.Status, core.StringPiece):
+    """Reads up to `n` bytes from the file starting at `offset`.
+
+    Returns `OUT_OF_RANGE` if fewer than n bytes were stored in `*result`
+    because of EOF.
+
+    Safe for concurrent use by multiple threads."""
+    return errors.Unimplemented("This filesystem does not support read()"), core.StringPiece()
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args):
+    errors.raise_if_error(self.close())
+
+
 class FileSystem(ABC):
   def parse_uri(self, name) -> (core.StringPiece, core.StringPiece, core.StringPiece):
     return io.parse_uri(name)
@@ -36,6 +68,10 @@ class FileSystem(ABC):
     name = core.string_view(name)
     result = os.path.normpath(bytes(name))
     return core.string_view(result)
+
+  @abstractmethod
+  def new_random_access_file(self, name) -> (errors.Status, RandomAccessFile):
+    return errors.Unimplemented("This filesystem does not support new_random_access_file()"), None
 
   @abstractmethod
   def get_file_size(self, name) -> (errors.Status, int):
@@ -66,17 +102,21 @@ class FileSystem(ABC):
     return errors.FailedPrecondition("Not a directory")
 
 
-class FileSystemRegistry:
+class FileSystemRegistry(ABC):
   Factory = Callable[[], FileSystem]
 
+  @abstractmethod
   def register_factory(self, scheme: str, factory: Factory) -> errors.Status:
     raise NotImplementedError()
 
+  @abstractmethod
   def register_filesystem(self, scheme: str, filesystem: FileSystem) -> errors.Status:
     raise NotImplementedError()
 
+  @abstractmethod
   def lookup(self, scheme: str) -> Optional[FileSystem]:
     raise NotImplementedError()
 
+  @abstractmethod
   def get_registered_file_system_schemes(self, schemes: List[str]) -> errors.Status:
     raise NotImplementedError()

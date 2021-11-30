@@ -1,5 +1,6 @@
 from . import errors
 from . import core
+from . import file_system
 from . import iterator
 import struct
 from dataclasses import dataclass
@@ -81,13 +82,13 @@ class BlockContents:
   heap_allocated: bool   # True iff caller should delete[] data.data()
 
 
-def read_block(file: core.RandomAccessFile, handle: BlockHandle) -> BlockContents:
+def read_block(file: file_system.RandomAccessFile, handle: BlockHandle) -> BlockContents:
   result = BlockContents()
   # result.data = core.StringPiece(b'')
   # result.cacheable = False
   # result.heap_allocated = False
   n = handle.size
-  contents = file.read(handle.offset, n + kBlockTrailerSize)
+  contents = errors.raise_if_error(file.read(handle.offset, n + kBlockTrailerSize))
   if contents.size() != n + kBlockTrailerSize:
     raise errors.DataLoss("truncated block read")
 
@@ -268,7 +269,7 @@ class Block:
 
 class Table:
   class Rep(NamedTuple):
-    file: core.RandomAccessFile
+    file: file_system.RandomAccessFile
     metaindex_handle: BlockHandle
     index_block: Block
 
@@ -276,10 +277,10 @@ class Table:
     self._rep = rep
 
   @classmethod
-  def open(cls, file: core.RandomAccessFile, size: int):
+  def open(cls, file: file_system.RandomAccessFile, size: int):
     if size < Footer.kEncodedLength:
       raise errors.DataLoss("file is too short to be an sstable")
-    footer_input = file.read(size - Footer.kEncodedLength, Footer.kEncodedLength)
+    footer_input = errors.raise_if_error(file.read(size - Footer.kEncodedLength, Footer.kEncodedLength))
     footer = Footer()
     footer.decode_from(footer_input)
 
