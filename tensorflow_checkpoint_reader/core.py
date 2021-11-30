@@ -1,5 +1,8 @@
 import struct
+import re
+import functools
 
+@functools.total_ordering
 class StringPiece:
   npos = -1
 
@@ -13,7 +16,7 @@ class StringPiece:
   def data(self):
     return StringPiece(self._ptr, self._length, self._offset)
 
-  def slice(self):
+  def slice(self) -> bytearray:
     return self._ptr[self._offset:self._offset + self._length]
 
   def set(self, other):
@@ -46,6 +49,10 @@ class StringPiece:
 
   def __getitem__(self, item):
     return self.at(item)
+
+  def __setitem__(self, pos, value):
+    assert 0 <= pos < self._length
+    self._ptr[self._offset + pos] = value
 
   def length(self) -> int:
     """Returns the number of characters in the `string_view`."""
@@ -89,6 +96,21 @@ class StringPiece:
 
   def rfind(self, target):
     return self.slice().rfind(string_view(target).slice())
+
+  def find_first_of(self, chars):
+    # chars = list(string_view(chars).slice())
+    # me = self.slice()
+    # for i, c in enumerate(me):
+    #   if c in chars:
+    #     return i
+    # return self.npos
+    pat = b'[' + re.escape(string_view(chars).slice()) + b']'
+    me = self.slice()
+    match = re.search(pat, me)
+    if match is None:
+      return self.npos
+    else:
+      return match.start()
 
   def substr(self, pos: int, n: int = npos):
     s = self.data()
@@ -136,6 +158,33 @@ class StringPiece:
     r = StringPiece(self)
     r.advance(-other)
     return r
+
+  def __eq__(self, other):
+    if isinstance(other, StringPiece):
+      if other._ptr is self._ptr:
+        if other._offset == self._offset:
+          return other._length == self._length
+    return False
+
+  def __lt__(self, other):
+    if isinstance(other, StringPiece):
+      if other._ptr is self._ptr:
+        return self._offset < other._offset
+    return False
+
+  def __bool__(self):
+    return not self.empty()
+
+  def __iadd__(self, n):
+    assert isinstance(n, int)
+    self.advance(n)
+    return self
+
+  def __isub__(self, n):
+    assert isinstance(n, int)
+    self.advance(n)
+    return self
+
 
 
 def string_view(data = None, length: int = None, offset: int = None) -> StringPiece:

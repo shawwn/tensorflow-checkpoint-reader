@@ -1,6 +1,9 @@
+from typing import Union, NamedTuple, Tuple
+import errno
+import os
+
 from .pb.tensorflow.core.protobuf import error_codes_pb2 as error
-from . import core, strings
-from typing import Union, NamedTuple, Tuple, Any
+from . import core, strings, platform
 
 ErrorType = int
 MsgType = Union[str, core.StringPiece]
@@ -240,6 +243,216 @@ class Unauthenticated(Status):
 
 def is_unauthenticated(status: Status):
   return status.code() == error.UNAUTHENTICATED
+
+
+class IOError(Status):
+  def __init__(self, context, err_number: int):
+    code = errno_to_code(err_number)
+    super().__init__(code, strings.str_cat(context, "; ", os.strerror(code)))
+
+
+def errno_to_code(err_number: int) -> ErrorType:
+  if err_number == 0:
+    return error.OK
+
+  if err_number == errno.EINVAL:        # Invalid argument
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ENAMETOOLONG:  # Filename too long
+    return error.INVALID_ARGUMENT
+  if err_number == errno.E2BIG:         # Argument list too long
+    return error.INVALID_ARGUMENT
+  if err_number == errno.EDESTADDRREQ:  # Destination address required
+    return error.INVALID_ARGUMENT
+  if err_number == errno.EDOM:          # Mathematics argument out of domain of function
+    return error.INVALID_ARGUMENT
+  if err_number == errno.EFAULT:        # Bad address
+    return error.INVALID_ARGUMENT
+  if err_number == errno.EILSEQ:        # Illegal byte sequence
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ENOPROTOOPT:   # Protocol not available
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ENOSTR:        # Not a STREAM
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ENOTSOCK:      # Not a socket
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ENOTTY:        # Inappropriate I/O control operation
+    return error.INVALID_ARGUMENT
+  if err_number == errno.EPROTOTYPE:    # Protocol wrong type for socket
+    return error.INVALID_ARGUMENT
+  if err_number == errno.ESPIPE:        # Invalid seek
+    return error.INVALID_ARGUMENT
+
+  if err_number == errno.ETIMEDOUT:  # Connection timed out
+    return error.DEADLINE_EXCEEDED
+  if err_number == errno.ETIME:      # Timer expired
+    return error.DEADLINE_EXCEEDED
+
+  if err_number == errno.ENODEV:  # No such device
+    return error.NOT_FOUND
+  if err_number == errno.ENOENT:  # No such file or directory
+    return error.NOT_FOUND
+  if err_number == errno.ENXIO:   # No such device or address
+    return error.NOT_FOUND
+  if err_number == errno.ESRCH:   # No such process
+    return error.NOT_FOUND
+
+  if err_number == errno.EEXIST:         # File exists
+    return error.ALREADY_EXISTS
+  if err_number == errno.EADDRNOTAVAIL:  # Address not available
+    return error.ALREADY_EXISTS
+  if err_number == errno.EALREADY:       # Connection already in progress
+    return error.ALREADY_EXISTS
+
+  if err_number == errno.EPERM:   # Operation not permitted
+    return error.PERMISSION_DENIED
+  if err_number == errno.EACCES:  # Permission denied
+    return error.PERMISSION_DENIED
+  if err_number == errno.EROFS:   # Read only file system
+    return error.PERMISSION_DENIED
+
+  if err_number == errno.ENOTEMPTY:   # Directory not empty
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EISDIR:      # Is a directory
+    return error.FAILED_PRECONDITION
+  if err_number == errno.ENOTDIR:     # Not a directory
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EADDRINUSE:  # Address already in use
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EBADF:       # Invalid file descriptor
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EBUSY:       # Device or resource busy
+    return error.FAILED_PRECONDITION
+  if err_number == errno.ECHILD:      # No child processes
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EISCONN:     # Socket is connected
+    return error.FAILED_PRECONDITION
+  if not platform.is_windows_platform() and not platform.is_haiku_platform():
+    if err_number == errno.ENOTBLK:  # Block device required
+      return error.FAILED_PRECONDITION
+  if err_number == errno.ENOTCONN:  # The socket is not connected
+    return error.FAILED_PRECONDITION
+  if err_number == errno.EPIPE:     # Broken pipe
+    return error.FAILED_PRECONDITION
+  if not platform.is_windows_platform():
+    if err_number == errno.ESHUTDOWN:  # Cannot send after transport endpoint shutdown
+      return error.FAILED_PRECONDITION
+  if err_number == errno.ETXTBSY:  # Text file busy
+    return error.FAILED_PRECONDITION
+
+  if err_number == errno.ENOSPC:  # No space left on device
+    return error.RESOURCE_EXHAUSTED
+  if not platform.is_windows_platform():
+    if err_number == errno.EDQUOT:  # Disk quota exceeded
+      return error.RESOURCE_EXHAUSTED
+  if err_number == errno.EMFILE:   # Too many open files
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.EMLINK:   # Too many links
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.ENFILE:   # Too many open files in system
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.ENOBUFS:  # No buffer space available
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.ENODATA:  # No message is available on the STREAM read queue
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.ENOMEM:   # Not enough space
+    return error.RESOURCE_EXHAUSTED
+  if err_number == errno.ENOSR:    # No STREAM resources
+    return error.RESOURCE_EXHAUSTED
+  if not platform.is_windows_platform() and not platform.is_haiku_platform():
+    if err_number == errno.EUSERS:  # Too many users
+      return error.RESOURCE_EXHAUSTED
+
+  if err_number == errno.EFBIG:      # File too large
+    return error.OUT_OF_RANGE
+  if err_number == errno.EOVERFLOW:  # Value too large to be stored in data type
+    return error.OUT_OF_RANGE
+  if err_number == errno.ERANGE:     # Result too large
+    return error.OUT_OF_RANGE
+
+  if err_number == errno.ENOSYS:        # Function not implemented
+    return error.UNIMPLEMENTED
+  if err_number == errno.ENOTSUP:       # Operation not supported
+    return error.UNIMPLEMENTED
+  if err_number == errno.EAFNOSUPPORT:  # Address family not supported
+    return error.UNIMPLEMENTED
+  if not platform.is_windows_platform():
+    if err_number == errno.EPFNOSUPPORT:  # Protocol family not supported
+      return error.UNIMPLEMENTED
+  if err_number == errno.EPROTONOSUPPORT:  # Protocol not supported
+    return error.UNIMPLEMENTED
+  if not platform.is_windows_platform() and not platform.is_haiku_platform():
+    if err_number == errno.ESOCKTNOSUPPORT:  # Socket type not supported
+      return error.UNIMPLEMENTED
+  if err_number == errno.EXDEV:  # Improper link
+    return error.UNIMPLEMENTED
+
+  if err_number == errno.EAGAIN:        # Resource temporarily unavailable
+    return error.UNAVAILABLE
+  if err_number == errno.ECONNREFUSED:  # Connection refused
+    return error.UNAVAILABLE
+  if err_number == errno.ECONNABORTED:  # Connection aborted
+    return error.UNAVAILABLE
+  if err_number == errno.ECONNRESET:    # Connection reset
+    return error.UNAVAILABLE
+  if err_number == errno.EINTR:         # Interrupted function call
+    return error.UNAVAILABLE
+  if not platform.is_windows_platform():
+    if err_number == errno.EHOSTDOWN:  # Host is down
+      return error.UNAVAILABLE
+  if err_number == errno.EHOSTUNREACH:  # Host is unreachable
+    return error.UNAVAILABLE
+  if err_number == errno.ENETDOWN:      # Network is down
+    return error.UNAVAILABLE
+  if err_number == errno.ENETRESET:     # Connection aborted by network
+    return error.UNAVAILABLE
+  if err_number == errno.ENETUNREACH:   # Network unreachable
+    return error.UNAVAILABLE
+  if err_number == errno.ENOLCK:        # No locks available
+    return error.UNAVAILABLE
+  if err_number == errno.ENOLINK:       # Link has been severed
+    return error.UNAVAILABLE
+  if not (platform.is_apple_platform() or platform.is_freebsd_platform() or platform.is_windows_platform()
+          or platform.is_haiku_platform()):
+    if err_number == errno.ENONET:  # Machine is not on the network
+      return error.UNAVAILABLE
+
+  if err_number == errno.EDEADLK:  # Resource deadlock avoided
+    return error.ABORTED
+  if not platform.is_windows_platform():
+    if err_number == errno.ESTALE:  # Stale file handle
+      return error.ABORTED
+
+  if err_number == errno.ECANCELED:  # Operation cancelled
+    return error.CANCELLED
+
+  # NOTE: If you get any of the following (especially in a
+  # reproducible way) and can propose a better mapping,
+  # please email the owners about updating this mapping.
+
+  if err_number == errno.EBADMSG:      # Bad message
+    return error.UNKNOWN
+  if err_number == errno.EIDRM:        # Identifier removed
+    return error.UNKNOWN
+  if err_number == errno.EINPROGRESS:  # Operation in progress
+    return error.UNKNOWN
+  if err_number == errno.EIO:          # I/O error
+    return error.UNKNOWN
+  if err_number == errno.ELOOP:        # Too many levels of symbolic links
+    return error.UNKNOWN
+  if err_number == errno.ENOEXEC:      # Exec format error
+    return error.UNKNOWN
+  if err_number == errno.ENOMSG:       # No message of the desired type
+    return error.UNKNOWN
+  if err_number == errno.EPROTO:       # Protocol error
+    return error.UNKNOWN
+  if not platform.is_windows_platform() and not platform.is_haiku_platform():
+    if err_number == errno.EREMOTE:  # Object is remote
+      return error.UNKNOWN
+
+  return error.UNKNOWN
+
+
+
 
 
 def raise_if_error(arg: Union[Status, Tuple]):

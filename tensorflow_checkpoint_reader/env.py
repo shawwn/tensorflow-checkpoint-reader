@@ -10,6 +10,7 @@ from . import misc
 from . import env_time
 from . import port
 from . import strings
+from . import platform
 
 _name_mutex = _threading.RLock()
 
@@ -66,7 +67,7 @@ class Env(ABC):
     implementation instead of relying on this default environment.
 
     The result of Default() belongs to this library and must never be deleted."""
-    return misc.putattr(cls, '_default_env', WindowsEnv if port.is_windows_platform() else PosixEnv)
+    return misc.putattr(cls, '_default_env', WindowsEnv if platform.is_windows_platform() else PosixEnv)
 
   def get_file_system_for_file(self, fname: str) -> (errors.Status, Optional[file_system.FileSystem]):
     """Returns the FileSystem object to handle operations on the file

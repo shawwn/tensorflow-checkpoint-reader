@@ -1,6 +1,7 @@
 from . import core
 from . import strings
 from . import port
+from . import platform
 
 Char = strings.Scanner.CharClass
 
@@ -35,7 +36,7 @@ def split_path(uri: core.StringPiece):
   uri = core.string_view(uri)
   scheme, host, path = parse_uri(uri)
   pos = path.rfind('/')
-  if port.is_windows_platform():
+  if platform.is_windows_platform():
     if pos == core.StringPiece.npos:
       pos = path.rfind('\\')
   # Handle the case with no '/' in 'path'.
