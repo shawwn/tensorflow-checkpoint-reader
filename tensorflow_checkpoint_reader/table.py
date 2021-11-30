@@ -66,7 +66,7 @@ class Footer:
     return self._metaindex_handle
 
   def decode_from(self, input: core.StringPiece):
-    magic = core.decode_fixed_64(input.data, Footer.kEncodedLength - 8)
+    magic = core.decode_fixed_64(input.data(), Footer.kEncodedLength - 8)
     if magic != kTableMagicNumber:
       raise errors.DataLoss("not an sstable (bad magic number)");
     self._metaindex_handle.decode_from(input)
@@ -88,7 +88,7 @@ def read_block(file: core.RandomAccessFile, handle: BlockHandle) -> BlockContent
   # result.heap_allocated = False
   n = handle.size
   contents = file.read(handle.offset, n + kBlockTrailerSize)
-  if contents.size != n + kBlockTrailerSize:
+  if contents.size() != n + kBlockTrailerSize:
     raise errors.DataLoss("truncated block read")
 
   # // Check the crc of the type and the block contents
@@ -104,7 +104,7 @@ def read_block(file: core.RandomAccessFile, handle: BlockHandle) -> BlockContent
   #     return s;
   #   }
   # }
-  data = contents.data
+  data = contents.data()
   if data[n] == CompressionType.kNoCompression.value:
     result.data = core.StringPiece(data, n)
     result.cacheable = False
@@ -152,7 +152,7 @@ class Block:
 
     def next_entry_offset(self) -> int:
       # return (value_.data() + value_.size()) - data_;
-      return self._value._offset + self._value.size
+      return self._value._offset + self._value.size()
 
     def get_restart_point(self, index: int) -> int:
       assert index < self._num_restarts
@@ -238,8 +238,8 @@ class Block:
 
 
   def __init__(self, contents: BlockContents):
-    self._data = contents.data.data
-    self._size = contents.data.size
+    self._data = contents.data.data()
+    self._size = contents.data.size()
     self._owned = contents.heap_allocated
     if self._size < 4:
       breakpoint()

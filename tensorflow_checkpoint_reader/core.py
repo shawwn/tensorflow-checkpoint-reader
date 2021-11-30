@@ -1,48 +1,112 @@
 import struct
 
 class StringPiece:
-  def __init__(self, data=None, size=None, offset=0):
-    if data is None:
-      data = b''
+  npos = -1
+
+  def __init__(self, data=None, size=None, offset=None):
+    self._ptr = b''
+    self._length = 0
+    self._offset = 0
     if isinstance(data, str):
       data = data.encode('utf-8')
-    self._data = data
-    if size is None:
-      size = len(data)
-    self._size = size
-    self._offset = offset
+    if isinstance(data, bytes):
+      self._ptr = data
+      self._length = len(data)
+      self._offset = 0
+    elif isinstance(data, StringPiece):
+      self.set(data)
+    if offset is not None:
+      self.remove_prefix(offset)
+    if size is not None:
+      self.remove_suffix(len(self) - size)
 
-  @property
   def data(self):
-    return self._data[self._offset:self._offset + self._size]
-
-  @property
-  def size(self):
-    return self._size
-
-  @property
-  def offset(self):
-    return self._offset
+    return self._ptr[self._offset:self._offset + self._length]
 
   def set(self, other):
-    self._data = other._data
-    self._size = other._size
+    self._ptr = other._ptr
+    self._length = other._length
     self._offset = other._offset
 
-  def advance(self, n):
-    if n > self._size:
-      raise ValueError(f"Can't advance by {n} bytes")
+  def length(self) -> int:
+    """Returns the number of characters in the `string_view`."""
+    return self._length
+
+  def size(self) -> int:
+    """Returns the number of characters in the `string_view`. Alias for `size()`."""
+    return self.length()
+
+  def empty(self) -> bool:
+    """Checks if the `string_view` is empty (refers to no characters)."""
+    return self._length <= 0
+
+  def advance(self, n: int):
+    if n < 0:
+      if -n > self._offset:
+        raise ValueError(f"Can't advance by {n}")
+    elif n > 0:
+      if n > self._length:
+        raise ValueError(f"Can't advance by {n}")
     self._offset += n
-    self._size -= n
+    self._length -= n
+
+  def remove_prefix(self, n: int):
+    """Removes the first `n` characters from the `string_view`. Note that the
+    underlying string is not changed, only the view."""
+    if n > self._length or n < 0:
+      raise ValueError(f"Can't remove {n} bytes")
+    self._offset += n
+    self._length -= n
+
+  def remove_suffix(self, n: int):
+    """Removes the last `n` characters from the `string_view`. Note that the
+    underlying string is not changed, only the view."""
+    if n > self._length or n < 0:
+      raise ValueError(f"Can't remove {n} bytes")
+    self._length -= n
+
+  def find(self, target):
+    return self.data().find(StringPiece(target).data())
+
+  def rfind(self, target):
+    return self.data().rfind(StringPiece(target).data())
+
+  def begin(self):
+    return StringPiece(self._ptr, self._length, self._offset)
+
+  def end(self):
+    return StringPiece(self._ptr, 0, self._offset + self._length)
 
   def __bytes__(self):
-    return self.data
+    return self.data()
 
   def __str__(self):
-    return self.data.decode('utf-8')
+    return self.data().decode('utf-8')
+
+  def __repr__(self):
+    return f"StringPiece({self.data()!r})"
 
   def __len__(self):
-    return self._size
+    return self.length()
+
+  def __add__(self, other):
+    assert isinstance(other, int)
+    r = StringPiece(self)
+    r.advance(other)
+    return r
+
+  def __sub__(self, other):
+    if isinstance(other, StringPiece):
+      if other._ptr is not self._ptr:
+        raise ValueError("Can only subtract pointers to same underlying data")
+      return self._offset - other._offset
+    r = StringPiece(self)
+    r.advance(-other)
+    return r
+
+
+def string_view(s, length: int = None, offset: int = None) -> StringPiece:
+  return StringPiece(s, length, offset)
 
 
 class RandomAccessFile:
@@ -57,7 +121,7 @@ class RandomAccessFile:
 
 def get_varint_64(input: StringPiece):
   result = 0
-  p = input.data
+  p = input.data()
   i = 0
   for shift in range(0, 64, 7):
     byte = p[i]
@@ -67,7 +131,7 @@ def get_varint_64(input: StringPiece):
       result |= ((byte & 127) << shift)
     else:
       result |= (byte << shift)
-      input.advance(i)
+      input.remove_prefix(i)
       return True, result
   return False, None
 
