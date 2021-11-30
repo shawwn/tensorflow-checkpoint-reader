@@ -1,8 +1,11 @@
 from .pb.tensorflow.core.framework import tensor_shape_pb2
 from .pb.tensorflow.core.framework import types_pb2
-from typing import Sequence
+from typing import Sequence, Optional
 
 from . import errors
+from . import numpy_util
+
+import numpy as np
 
 class TensorShape:
   def __init__(self, data_type: types_pb2.DataType = types_pb2.DT_INVALID):
@@ -27,7 +30,7 @@ class TensorShape:
     return tuple(self._dims)
 
   def __repr__(self):
-    return f"TensorShape(data_type={self.data_type()}, num_elements={self.num_elements()}, dims={self.to_list()})"
+    return f"TensorShape(data_type={self.data_type()}, dtype={self.dtype()}, num_elements={self.num_elements()}, dims={self.to_list()})"
 
   def __iter__(self):
     return iter(self.to_list())
@@ -45,6 +48,13 @@ class TensorShape:
 
   def data_type(self) -> types_pb2.DataType:
     return self._data_type
+
+  def dtype(self) -> Optional[np.dtype]:
+    s, dtype = numpy_util.data_type_to_numpy_dtype(self.data_type())
+    if s.ok():
+      return dtype
+    else:
+      return None
 
   def set_data_type(self, data_type: types_pb2.DataType):
     self._data_type = data_type

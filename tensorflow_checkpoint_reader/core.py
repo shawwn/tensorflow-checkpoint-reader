@@ -22,6 +22,9 @@ class StringPiece:
   def bytes(self) -> bytes:
     return bytes(self)
 
+  def memoryview(self) -> memoryview:
+    return memoryview(self.slice())
+
   def set(self, other):
     if other is None:
       self._ptr = bytearray()

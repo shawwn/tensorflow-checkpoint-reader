@@ -1,14 +1,27 @@
 from .pb.tensorflow.core.framework import types_pb2
 from . import tensor_shape
+from . import errors
+
+from typing import Tuple, Optional
 
 import numpy as np
 
+
 class TensorBuffer:
-  def __init__(self, data = None):
+  def __init__(self, data=None, array_offset=0, order="C"):
     self._data = data
+    self._array_offset = array_offset
+    self._order = order
 
   def data(self):
     return self._data
+
+  def array_offset(self):
+    return self._array_offset
+
+  def order(self):
+    return self._order
+
 
 class Tensor:
   def __init__(self,
@@ -21,12 +34,15 @@ class Tensor:
     self._shape = shape
     self._buf = buf
 
+  def __repr__(self):
+    return f"Tensor(is_initialized={self.is_initialized()}, shape={self.shape()!r})"
+
   def shape(self) -> tensor_shape.TensorShape:
     return self._shape
 
   def dtype(self) -> types_pb2.DataType:
     return self._shape.data_type()
-  
+
   def dims(self) -> int:
     return self.shape().dims()
 
@@ -46,14 +62,22 @@ class Tensor:
   def set_data(self, buf: TensorBuffer):
     self._buf = buf
 
-  def to_py(self) -> np.ndarray:
-    assert self.is_initialized()
-    data_type = self.dtype()
-    assert data_type is types_pb2.DT_FLOAT
-    dtype = np.float32
-    shape = self.shape().to_list()
+  def to_py(self) -> Tuple[errors.Status, Optional[np.ndarray]]:
+    if not self.is_initialized():
+      return errors.FailedPrecondition("Not initialized"), None
+    shape = self.shape()
+    dtype = shape.dtype()
+    if dtype is None:
+      return errors.Unimplemented("Data type ", shape.data_type(), " not supported"), None
     if self.num_elements() != 0:
-      a = np.frombuffer(self._buf.data(), dtype, self.shape().num_elements())
-      return a.reshape(shape)
+      arr = np.ndarray.__new__(np.ndarray,
+                               shape=shape.to_list(),
+                               dtype=dtype,
+                               buffer=self._buf.data(),
+                               offset=self._buf.array_offset(),
+                               order=self._buf.order())
+      # a = np.frombuffer(self._buf.data(), dtype, shape.num_elements())
+      # a = a.reshape(shape.to_list())
     else:
-      return np.zeros(shape, dtype)
+      arr = np.zeros(shape.to_list(), dtype)
+    return errors.Status.OK(), arr
