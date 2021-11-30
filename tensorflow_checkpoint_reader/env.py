@@ -2,7 +2,6 @@ from typing import Callable, List, Optional, Dict, NamedTuple
 import abc as _abc
 import threading as _threading
 import os as _os
-import contextlib as _contextlib
 
 from . import file_system
 from . import errors
