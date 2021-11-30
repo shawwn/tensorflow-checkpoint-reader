@@ -66,7 +66,7 @@ class Footer:
     return self._metaindex_handle
 
   def decode_from(self, input: core.StringPiece):
-    magic = core.decode_fixed_64(input.data(), Footer.kEncodedLength - 8)
+    magic = core.decode_fixed_64(input.slice(), Footer.kEncodedLength - 8)
     if magic != kTableMagicNumber:
       raise errors.DataLoss("not an sstable (bad magic number)");
     self._metaindex_handle.decode_from(input)
@@ -104,7 +104,7 @@ def read_block(file: core.RandomAccessFile, handle: BlockHandle) -> BlockContent
   #     return s;
   #   }
   # }
-  data = contents.data()
+  data = contents.slice()
   if data[n] == CompressionType.kNoCompression.value:
     result.data = core.StringPiece(data, n)
     result.cacheable = False
@@ -238,7 +238,7 @@ class Block:
 
 
   def __init__(self, contents: BlockContents):
-    self._data = contents.data.data()
+    self._data = contents.data.slice()
     self._size = contents.data.size()
     self._owned = contents.heap_allocated
     if self._size < 4:

@@ -4,12 +4,19 @@ class StringPiece:
   npos = -1
 
   def __init__(self, data=None, size=None, offset=None):
-    self._ptr = b''
-    self._length = 0
-    self._offset = 0
-    if isinstance(data, str):
-      data = data.encode('utf-8')
-    if isinstance(data, bytes):
+    if data is None:
+      self._ptr = bytearray()
+      self._length = 0
+      self._offset = 0
+    elif isinstance(data, str):
+      self._ptr = bytearray(data, 'utf-8')
+      self._length = len(data)
+      self._offset = 0
+    elif isinstance(data, bytes):
+      self._ptr = bytearray(data)
+      self._length = len(data)
+      self._offset = 0
+    elif isinstance(data, bytearray):
       self._ptr = data
       self._length = len(data)
       self._offset = 0
@@ -21,12 +28,22 @@ class StringPiece:
       self.remove_suffix(len(self) - size)
 
   def data(self):
+    return StringPiece(self._ptr, self._length, self._offset)
+
+  def slice(self):
     return self._ptr[self._offset:self._offset + self._length]
 
   def set(self, other):
     self._ptr = other._ptr
     self._length = other._length
     self._offset = other._offset
+
+  def at(self, pos: int):
+    assert 0 <= pos < self._length
+    return self._ptr[self._offset + pos]
+
+  def __getitem__(self, item):
+    return self.at(item)
 
   def length(self) -> int:
     """Returns the number of characters in the `string_view`."""
@@ -66,10 +83,24 @@ class StringPiece:
     self._length -= n
 
   def find(self, target):
-    return self.data().find(string_view(target).data())
+    return self.slice().find(string_view(target).slice())
 
   def rfind(self, target):
-    return self.data().rfind(string_view(target).data())
+    return self.slice().rfind(string_view(target).slice())
+
+  def substr(self, pos: int, n: int = npos):
+    s = self.data()
+    s.advance(pos)
+    if n != StringPiece.npos:
+      s.remove_suffix(len(s) - n)
+    return s
+    # s = self.slice()
+    # if pos < 0:
+    #   pos += len(s)
+    # if n == StringPiece.npos:
+    #   return s[pos:]
+    # else:
+    #   return s[pos:pos + n]
 
   def begin(self):
     return StringPiece(self._ptr, self._length, self._offset)
@@ -78,13 +109,13 @@ class StringPiece:
     return StringPiece(self._ptr, 0, self._offset + self._length)
 
   def __bytes__(self):
-    return self.data()
+    return bytes(self.slice())
 
   def __str__(self):
-    return self.data().decode('utf-8')
+    return self.slice().decode('utf-8')
 
   def __repr__(self):
-    return f"StringPiece({self.data()!r})"
+    return f"StringPiece({self.slice()!r})"
 
   def __len__(self):
     return self.length()
@@ -105,8 +136,8 @@ class StringPiece:
     return r
 
 
-def string_view(s, length: int = None, offset: int = None) -> StringPiece:
-  return StringPiece(s, length, offset)
+def string_view(data = None, length: int = None, offset: int = None) -> StringPiece:
+  return StringPiece(data, length, offset)
 
 
 class RandomAccessFile:
@@ -121,7 +152,7 @@ class RandomAccessFile:
 
 def get_varint_64(input: StringPiece):
   result = 0
-  p = input.data()
+  p = input.slice()
   i = 0
   for shift in range(0, 64, 7):
     byte = p[i]
