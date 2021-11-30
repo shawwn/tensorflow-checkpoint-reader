@@ -1,13 +1,10 @@
-from . import core, strings
-import os as _os
+from . import core
+from . import strings
+from . import port
 
 Char = strings.Scanner.CharClass
 
 kPathSep = b"/"
-
-# https://stackoverflow.com/questions/1325581/how-do-i-check-if-im-running-on-windows-in-python
-def _platform_windows() -> bool:
-  return _os.name == 'nt'
 
 def join_path(*paths: core.StringPiece):
   result = b''
@@ -38,7 +35,7 @@ def split_path(uri: core.StringPiece):
   uri = core.string_view(uri)
   scheme, host, path = parse_uri(uri)
   pos = path.rfind('/')
-  if _platform_windows():
+  if port.is_windows_platform():
     if pos == core.StringPiece.npos:
       pos = path.rfind('\\')
   # Handle the case with no '/' in 'path'.

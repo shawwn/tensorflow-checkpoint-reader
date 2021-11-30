@@ -2,8 +2,23 @@ from enum import Enum, auto
 
 from . import core, str_util
 
+from fifostr import FIFOStr
+
+class string(FIFOStr):
+  def __init__(self, value = ""):
+    super().__init__(2 ** 63 - 1)
+    self.append(value)
+
+  def set(self, value: str):
+    self.clear()
+    self.append(str(value))
+
 def str_cat(*args):
   return ''.join([str(x) for x in args])
+
+def printf(format: str, *args):
+  format = format.replace('%llx', '%x')
+  return format % args
 
 class Ascii:
   LOWER_A = ord('a')

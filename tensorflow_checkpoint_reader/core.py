@@ -3,29 +3,12 @@ import struct
 class StringPiece:
   npos = -1
 
-  def __init__(self, data=None, size=None, offset=None):
-    if data is None:
-      self._ptr = bytearray()
-      self._length = 0
-      self._offset = 0
-    elif isinstance(data, str):
-      self._ptr = bytearray(data, 'utf-8')
-      self._length = len(data)
-      self._offset = 0
-    elif isinstance(data, bytes):
-      self._ptr = bytearray(data)
-      self._length = len(data)
-      self._offset = 0
-    elif isinstance(data, bytearray):
-      self._ptr = data
-      self._length = len(data)
-      self._offset = 0
-    elif isinstance(data, StringPiece):
-      self.set(data)
+  def __init__(self, value=None, size=None, offset=None):
+    self.set(value)
     if offset is not None:
       self.remove_prefix(offset)
     if size is not None:
-      self.remove_suffix(len(self) - size)
+      self.remove_suffix(self.size() - size)
 
   def data(self):
     return StringPiece(self._ptr, self._length, self._offset)
@@ -34,9 +17,28 @@ class StringPiece:
     return self._ptr[self._offset:self._offset + self._length]
 
   def set(self, other):
-    self._ptr = other._ptr
-    self._length = other._length
-    self._offset = other._offset
+    if other is None:
+      self._ptr = bytearray()
+      self._length = 0
+      self._offset = 0
+    elif isinstance(other, str):
+      self._ptr = bytearray(other, 'utf-8')
+      self._length = len(other)
+      self._offset = 0
+    elif isinstance(other, bytes):
+      self._ptr = bytearray(other)
+      self._length = len(other)
+      self._offset = 0
+    elif isinstance(other, bytearray):
+      self._ptr = other
+      self._length = len(other)
+      self._offset = 0
+    elif isinstance(other, StringPiece):
+      self._ptr = other._ptr
+      self._length = other._length
+      self._offset = other._offset
+    else:
+      raise TypeError("Expected stringlike")
 
   def at(self, pos: int):
     assert 0 <= pos < self._length
