@@ -66,10 +66,10 @@ class StringPiece:
     self._length -= n
 
   def find(self, target):
-    return self.data().find(StringPiece(target).data())
+    return self.data().find(string_view(target).data())
 
   def rfind(self, target):
-    return self.data().rfind(StringPiece(target).data())
+    return self.data().rfind(string_view(target).data())
 
   def begin(self):
     return StringPiece(self._ptr, self._length, self._offset)
