@@ -1,5 +1,6 @@
+from abc import ABC
 from typing import Callable, List, Optional, Dict, NamedTuple
-import abc as _abc
+from functools import wraps as _wraps
 import threading as _threading
 import os as _os
 
@@ -10,6 +11,8 @@ from . import env_time
 from . import port
 from . import strings
 
+_name_mutex = _threading.RLock()
+
 class ThreadOptions(NamedTuple):
   """Options to configure a Thread.
 
@@ -19,7 +22,6 @@ class ThreadOptions(NamedTuple):
   stack_size: int = 0  # Thread stack size to use (in bytes).
   guard_size: int = 0  # Guard area size to use near thread stacks to use (in bytes)
   numa_node: int = port.kNUMANoAffinity
-
 
 class Thread:
   """Represents a thread used to run a TensorFlow function."""
@@ -43,7 +45,7 @@ class Thread:
     self.release()
 
 
-class Env(_abc.ABC):
+class Env(ABC):
   """An interface used by the tensorflow implementation to
   access operating system functionality like the filesystem etc.
 
@@ -128,7 +130,7 @@ class Env(_abc.ABC):
 
   def get_current_thread_name(self, name: strings.string) -> bool:
     """Copies current thread name to "name". Returns true if success."""
-    with name_mutex:
+    with _name_mutex:
       if port.get_current_thread_id() in get_thread_name_registry():
         name.set(get_thread_name_registry()[port.get_current_thread_id()])
         return True
@@ -145,12 +147,11 @@ class Env(_abc.ABC):
     of microseconds.
 
     NOTE(mrry): This closure must not block."""
+    @_wraps(closure)
     def thunk():
       self.sleep_for_microseconds(micros)
       closure()
     return self.sched_closure(thunk)
-
-
 
 class ThreadParams(NamedTuple):
   name: str
@@ -163,24 +164,20 @@ class PThread(Thread):
     super().__init__(thread)
     thread.start()
 
-
 def _thread_fn(params: ThreadParams):
-  with name_mutex:
+  with _name_mutex:
     get_thread_name_registry()[port.get_current_thread_id()] = params.name
   params.fn()
-  with name_mutex:
+  with _name_mutex:
     del get_thread_name_registry()[port.get_current_thread_id()]
-
 
 def get_thread_name_registry() -> Dict[int, str]:
   return misc.putattr(get_thread_name_registry, 'singleton', lambda: dict())
 
-
-class PosixEnv(Env):
+class PosixEnv(Env, ABC):
   pass
 
-
-class WindowsEnv(Env):
+class WindowsEnv(Env, ABC):
   pass
 
 class FileSystemRegistryImpl(file_system.FileSystemRegistry):
@@ -230,6 +227,3 @@ def setenv(name: str, value: str, overwrite: int) -> int:
 def unsetenv(name: str) -> int:
   _os.unsetenv(str(name))
   return 0
-
-
-name_mutex = _threading.RLock()
