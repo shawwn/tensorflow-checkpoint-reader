@@ -2,7 +2,13 @@
 from setuptools import setup
 
 packages = \
-['tensorflow_checkpoint_reader']
+['tensorflow_checkpoint_reader',
+ 'tensorflow_checkpoint_reader.pb.tensorflow.core.example',
+ 'tensorflow_checkpoint_reader.pb.tensorflow.core.framework',
+ 'tensorflow_checkpoint_reader.pb.tensorflow.core.protobuf',
+ 'tensorflow_checkpoint_reader.pb.tensorflow.core.util',
+ 'tensorflow_checkpoint_reader.pb.tensorflow.stream_executor',
+ 'tensorflow_checkpoint_reader.std']
 
 package_data = \
 {'': ['*']}

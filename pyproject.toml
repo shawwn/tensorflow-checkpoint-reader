@@ -11,9 +11,6 @@ packages = [{include = "tensorflow_checkpoint_reader"}]
 [tool.poetry.dependencies]
 python = "^3.6"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^5.2"
-
 [build-system]
 requires = ["setuptools", "poetry-core"]
 build-backend = "poetry.core.masonry.api"
