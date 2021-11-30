@@ -24,10 +24,10 @@ def for_each(first: int, last: int, f: Callable[[int], None]):
 # A globbing pattern can only start with these characters:
 kGlobbingChars = "*?[\\"
 
-def is_globbing_pattern(pattern: str) -> bool:
+def is_globbing_pattern(pattern: bytes) -> bool:
   return core.string_view(pattern).find_first_of(kGlobbingChars) != core.StringPiece.npos
 
-def patch_pattern(pattern) -> bytearray:
+def patch_pattern(pattern) -> bytes:
   """Make sure that the first entry in `dirs` during glob expansion does not
   contain a glob pattern. This is to prevent a corner-case bug where
   `<pattern>` would be treated differently than `./<pattern>`."""
@@ -37,9 +37,9 @@ def patch_pattern(pattern) -> bytearray:
   if io.dirname(fixed_prefix).empty():
     return io.join_path(".", pat)
   # No patching needed
-  return pat.slice()
+  return pat.bytes()
 
-def all_directory_prefixes(d) -> List[bytearray]:
+def all_directory_prefixes(d) -> List[bytes]:
   d = core.string_view(d)
   dirs = []
   patched = patch_pattern(d)
@@ -53,7 +53,7 @@ def all_directory_prefixes(d) -> List[bytearray]:
   if is_directory:
     dir = io.dirname(dir)
   while not dir.empty():
-    dirs.append(dir.slice())
+    dirs.append(dir.bytes())
     new_dir = io.dirname(dir)
     # io::Dirname("/") returns "/" so we need to break the loop.
     # On Windows, io::Dirname("C:\\") would return "C:\\", so we check for
@@ -65,7 +65,7 @@ def all_directory_prefixes(d) -> List[bytearray]:
   dirs = list(reversed(dirs))
   return dirs
 
-def get_first_globbing_entry(dirs: List[bytearray]) -> int:
+def get_first_globbing_entry(dirs: List[bytes]) -> int:
   i = 0
   for d in dirs:
     if is_globbing_pattern(d):

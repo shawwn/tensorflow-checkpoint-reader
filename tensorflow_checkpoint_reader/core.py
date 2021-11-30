@@ -19,6 +19,9 @@ class StringPiece:
   def slice(self) -> bytearray:
     return self._ptr[self._offset:self._offset + self._length]
 
+  def bytes(self) -> bytes:
+    return bytes(self)
+
   def set(self, other):
     if other is None:
       self._ptr = bytearray()
@@ -186,10 +189,8 @@ class StringPiece:
     return self
 
 
-
 def string_view(data = None, length: int = None, offset: int = None) -> StringPiece:
   return StringPiece(data, length, offset)
-
 
 def get_varint_64(input: StringPiece):
   result = 0
@@ -207,7 +208,6 @@ def get_varint_64(input: StringPiece):
       return True, result
   return False, None
 
-
 def get_varint_32_ptr(data: bytes, p: int, limit: int):
   if p < limit:
     result = data[p]
@@ -215,7 +215,6 @@ def get_varint_32_ptr(data: bytes, p: int, limit: int):
       value = result
       return p + 1, value
   return get_varint_32_ptr_fallback(data, p, limit)
-
 
 def get_varint_32_ptr_fallback(data: bytes, p: int, limit: int):
   result = 0
@@ -233,10 +232,8 @@ def get_varint_32_ptr_fallback(data: bytes, p: int, limit: int):
       return p, value
   return None, None
 
-
 def decode_fixed_64(buffer, offset=0):
   return struct.unpack_from('<Q', buffer, offset=offset)[0]
-
 
 def decode_fixed_32(buffer, offset=0):
   return struct.unpack_from('<L', buffer, offset=offset)[0]

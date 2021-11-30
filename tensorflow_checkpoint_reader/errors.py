@@ -451,10 +451,6 @@ def errno_to_code(err_number: int) -> ErrorType:
 
   return error.UNKNOWN
 
-
-
-
-
 def raise_if_error(arg: Union[Status, Tuple]):
   status, *rest = (arg,) if not isinstance(arg, tuple) else arg
   if not status.ok():

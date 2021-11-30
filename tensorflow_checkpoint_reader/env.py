@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Callable, List, Optional, Dict, NamedTuple, Tuple
+from typing import Callable, List, Optional, Dict, NamedTuple, Tuple, Union
 from functools import wraps as _wraps
 import threading as _threading
 import os as _os
@@ -72,14 +72,14 @@ class Env(ABC):
     The result of Default() belongs to this library and must never be deleted."""
     return misc.putattr(cls, '_default_env', WindowsEnv if platform.is_windows_platform() else PosixEnv)
 
-  def get_file_system_for_file(self, fname: str) -> Tuple[errors.Status, file_system.FileSystem]:
+  def get_file_system_for_file(self, fname: bytes) -> Tuple[errors.Status, Optional[file_system.FileSystem]]:
     """Returns the FileSystem object to handle operations on the file
     specified by 'fname'. The FileSystem object is used as the implementa
     for the file system related (non-virtual) functions that follow.
     Returned FileSystem object is still owned by the Env object and will
     (might) be destroyed when the environment is destroyed."""
     scheme, host, path = io.parse_uri(fname)
-    file_system = self._file_system_registry.lookup(bytes(scheme))
+    file_system = self._file_system_registry.lookup(scheme.bytes())
     if file_system is None:
       if scheme.empty():
         scheme = core.string_view(b"[local]")
@@ -99,7 +99,7 @@ class Env(ABC):
       return err, None
     return fs.new_random_access_file(fname)
 
-  def get_registered_file_system_schemes(self, schemes: List[str]) -> errors.Status:
+  def get_registered_file_system_schemes(self, schemes: List[bytes]) -> errors.Status:
     """Returns the file system schemes registered for this Env."""
     return self._file_system_registry.get_registered_file_system_schemes(schemes)
 
@@ -151,13 +151,13 @@ class Env(ABC):
     Windows: Returns thread id which is unique."""
     return port.get_current_thread_id()
 
-  def get_current_thread_name(self, name: strings.string) -> bool:
-    """Copies current thread name to "name". Returns true if success."""
+  def get_current_thread_name(self) -> Optional[str]:
+    """Returns the current thread name if possible, otherwise None."""
     with _name_mutex:
       if port.get_current_thread_id() in get_thread_name_registry():
-        name.set(get_thread_name_registry()[port.get_current_thread_id()])
-        return True
-      return False
+        name = get_thread_name_registry()[port.get_current_thread_id()]
+        return name
+      return None
   
   def sched_closure(self, closure: Callable[[], None]):
     """Schedules the given closure on a thread-pool.
@@ -210,27 +210,27 @@ class FileSystemRegistryImpl(file_system.FileSystemRegistry):
     self._mu = _threading.RLock()
     self._registry = dict()
 
-  def register_factory(self, scheme, factory: file_system.FileSystemRegistry.Factory) -> errors.Status:
+  def register_factory(self, scheme: bytes, factory: file_system.FileSystemRegistry.Factory) -> errors.Status:
     with self._mu:
-      scheme = bytes(core.string_view(scheme))
+      scheme = core.string_view(scheme).bytes()
       if scheme in self._registry:
         return errors.AlreadyExists("File factory for ", scheme,
                                     " already registered")
       self._registry[scheme] = factory()
       return errors.Status.OK()
 
-  def register_filesystem(self, scheme, filesystem: file_system.FileSystem) -> errors.Status:
+  def register_filesystem(self, scheme: bytes, filesystem: file_system.FileSystem) -> errors.Status:
     with self._mu:
-      scheme = bytes(core.string_view(scheme))
+      scheme = core.string_view(scheme).bytes()
       if scheme in self._registry:
         return errors.AlreadyExists("File factory for ", scheme,
                                     " already registered")
       self._registry[scheme] = filesystem
       return errors.Status.OK()
 
-  def lookup(self, scheme) -> Optional[file_system.FileSystem]:
+  def lookup(self, scheme: bytes) -> Optional[file_system.FileSystem]:
     with self._mu:
-      scheme = bytes(core.string_view(scheme))
+      scheme = core.string_view(scheme).bytes()
       if scheme in self._registry:
         return self._registry[scheme]
 

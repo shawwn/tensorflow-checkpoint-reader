@@ -26,4 +26,3 @@ class EnvTime:
   def now_seconds(cls) -> int:
     """Returns the number of seconds since the Unix epoch."""
     return cls.now_nanos() // cls.kSecondsToNanos
-

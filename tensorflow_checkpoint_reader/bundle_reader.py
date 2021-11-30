@@ -26,6 +26,6 @@ class BundleReader:
     while iter2.valid():
       iter2.next()
       if iter2.valid():
-        print(iter2.key().slice())
+        print(iter2.key().bytes())
     breakpoint()
 

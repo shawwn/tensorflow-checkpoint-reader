@@ -1,13 +1,14 @@
 from . import core
 from . import strings
-from . import port
 from . import platform
+
+from typing import Tuple
 
 Char = strings.Scanner.CharClass
 
 kPathSep = b"/"
 
-def join_path(*paths: core.StringPiece):
+def join_path(*paths) -> bytes:
   result = b''
   for path in paths:
     path = core.string_view(path)
@@ -28,7 +29,7 @@ def join_path(*paths: core.StringPiece):
       result += path.slice()
   return result
 
-def split_path(uri: core.StringPiece):
+def split_path(uri) -> Tuple[core.StringPiece, core.StringPiece]:
   """Return the parts of the URI, split on the final "/" in the path. If there is
   no "/" in the path, the first part of the output is the scheme and host, and
   the second is the path. If the only "/" in the path is the first character,
@@ -51,8 +52,7 @@ def split_path(uri: core.StringPiece):
   return (core.StringPiece(uri.begin(), path.begin() + pos - uri.begin()),
           core.StringPiece(path.data() + pos + 1, path.size() - (pos + 1)))
 
-
-def split_basename(path: core.StringPiece):
+def split_basename(path) -> Tuple[core.StringPiece, core.StringPiece]:
   """Return the parts of the basename of path, split on the final ".".
   If there is no "." in the basename or "." is the final character in the
   basename, the second value will be empty."""
@@ -64,23 +64,23 @@ def split_basename(path: core.StringPiece):
   return (core.StringPiece(path.data(), pos),
           core.StringPiece(path.data() + pos + 1, path.size() - (pos + 1)))
 
-def is_absolute_path(path: core.StringPiece):
+def is_absolute_path(path) -> bool:
   path = core.string_view(path)
   return not path.empty() and path[0] == strings.Ascii.SLASH
 
-def dirname(path: core.StringPiece):
+def dirname(path) -> core.StringPiece:
   return split_path(path)[0]
 
-def basename(path: core.StringPiece):
+def basename(path) -> core.StringPiece:
   return split_path(path)[1]
 
-def extension(path: core.StringPiece):
+def extension(path) -> core.StringPiece:
   return split_basename(path)[1]
 
-def clean_path(path: core.StringPiece):
+def clean_path(path) -> core.StringPiece:
   raise NotImplementedError()
 
-def parse_uri(remaining: core.StringPiece):
+def parse_uri(remaining) -> Tuple[core.StringPiece, core.StringPiece, core.StringPiece]:
   remaining = core.string_view(remaining)
   scheme = core.string_view()
   host = core.string_view()
@@ -104,8 +104,8 @@ def parse_uri(remaining: core.StringPiece):
 
   # 1. Parse host
   if not strings.Scanner(remaining) \
-    .scan_until(strings.Ascii.SLASH) \
-    .get_result(remaining, host):
+          .scan_until(strings.Ascii.SLASH) \
+          .get_result(remaining, host):
     # No path, so the rest of the URI is the host
     host.set(remaining)
     path.set(core.StringPiece(remaining.begin(), 0))
@@ -116,8 +116,10 @@ def parse_uri(remaining: core.StringPiece):
   return scheme, host, path
 
 
-def create_uri(scheme: core.StringPiece, host: core.StringPiece, path: core.StringPiece):
+def create_uri(scheme, host, path) -> core.StringPiece:
   scheme = core.string_view(scheme)
+  host = core.string_view(host)
+  path = core.string_view(path)
   if scheme.empty():
-    return str(path)
-  return strings.str_cat(scheme, "://", host, path)
+    return path
+  return core.StringPiece(scheme.bytes() + b"://" + host.bytes() + path.bytes())

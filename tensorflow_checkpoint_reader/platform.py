@@ -17,4 +17,4 @@ def is_iphone_platform() -> bool:
   return False  # TODO: Does Python run on iOS?
 
 def is_haiku_platform() -> bool:
-  return False  # TODO: figure out how to check this.
+  return _platform.system() == "Haiku"  # TODO: Is this correct?
