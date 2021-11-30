@@ -1,4 +1,5 @@
 from enum import Enum, auto
+from typing import Union
 
 from . import core, str_util
 
@@ -16,8 +17,9 @@ from . import core, str_util
 def str_cat(*args):
   return ''.join([str(x) for x in args])
 
-def printf(format: str, *args):
-  format = format.replace('%llx', '%x')
+def printf(format, *args) -> bytes:
+  format = core.string_view(format).bytes()
+  format = format.replace(b"%llx", b"%x")
   return format % args
 
 class Ascii:
