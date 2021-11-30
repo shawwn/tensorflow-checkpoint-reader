@@ -6,11 +6,13 @@ from . import naming
 from . import tensor
 from . import tensor_shape
 from . import file_system
+from . import file_system_helper
 from .pb.tensorflow.core.protobuf import tensor_bundle_pb2
 from .pb.tensorflow.core.framework import types_pb2
 
 from typing import Tuple, Optional, List
 import time
+import sys
 
 import numpy as np
 import mmap
@@ -53,12 +55,14 @@ class BundleReader:
       # arr = errors.raise_if_error(self.get_value(val)).to_py()
       arr = errors.raise_if_error(self.get_numpy(val))
       self._tensors.append((key, arr))
-      print(key, arr.shape)
+      # print(key, arr.shape)
       # print(arr.reshape((-1,))[0])
-      print(arr)
+      # print(arr)
+      # print(arr.sum(axis=-1))
       iter2.next()
+    # file_system_helper.for_each(0, len(self._tensors), lambda i: print(self._env.get_current_thread_id(), self._tensors[i][0], self._tensors[i][1].sum()))
     elapsed = time.time() - now
-    print('%0.2f msec' % (elapsed * 1000.0))
+    print('%0.2f msec' % (elapsed * 1000.0), file=sys.stderr)
 
   def get_file(self, entry: tensor_bundle_pb2.BundleEntryProto) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
     # Open the data file if it has not been opened.
