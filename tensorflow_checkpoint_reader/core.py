@@ -4,6 +4,8 @@ class StringPiece:
   def __init__(self, data=None, size=None, offset=0):
     if data is None:
       data = b''
+    if isinstance(data, str):
+      data = data.encode('utf-8')
     self._data = data
     if size is None:
       size = len(data)
@@ -32,6 +34,15 @@ class StringPiece:
       raise ValueError(f"Can't advance by {n} bytes")
     self._offset += n
     self._size -= n
+
+  def __bytes__(self):
+    return self.data
+
+  def __str__(self):
+    return self.data.decode('utf-8')
+
+  def __len__(self):
+    return self._size
 
 
 class RandomAccessFile:
