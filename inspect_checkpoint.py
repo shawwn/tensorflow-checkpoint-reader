@@ -11,6 +11,6 @@ if __name__ == '__main__':
   # pp(reader.get_variable_to_shape_map())
   # pp(reader.get_variable_to_dtype_map())
   for name, v in values.items():
-    print(name.decode('utf-8') + ':\t', str(v.dtype).replace('float', 'f') + str(list(v.shape)).replace(' ', ''), '= {:,}'.format(np.prod(v.shape)) if len(v.shape) > 1 else '')
+    print(name + ':\t', str(v.dtype).replace('float', 'f') + str(list(v.shape)).replace(' ', ''), '= {:,}'.format(np.prod(v.shape)) if len(v.shape) > 1 else '')
     # print('', v)
   print('Total params: {:,}'.format(sum([np.prod(x.shape) for x in values.values()])))
