@@ -1,31 +1,12 @@
-protoc --proto_path=tensorflow_checkpoint_reader/pb --python_out=tensorflow_checkpoint_reader/pb tensorflow_checkpoint_reader/pb/tensorflow/core/protobuf/tensor_bundle.proto
-for x in allocation_description.proto \
-api_def.proto \
-attr_value.proto \
-cost_graph.proto \
-dataset_options.proto \
-device_attributes.proto \
-full_type.proto \
-function.proto \
-graph.proto \
-graph_transfer_info.proto \
-kernel_def.proto \
-log_memory.proto \
-model.proto \
-node_def.proto \
-op_def.proto \
-reader_base.proto \
-resource_handle.proto \
-step_stats.proto \
-summary.proto \
-tensor.proto \
-tensor_description.proto \
-tensor_shape.proto \
-tensor_slice.proto \
-types.proto \
-variable.proto \
-versions.proto
-do
-  echo $x
-  protoc --proto_path=tensorflow_checkpoint_reader/pb --python_out=tensorflow_checkpoint_reader/pb tensorflow_checkpoint_reader/pb/tensorflow/core/framework/$x
-done
+# protoc can't generate relative imports.
+# See https://github.com/protocolbuffers/protobuf/issues/1491
+#
+# set -ex
+# find . -type f -name '*.proto' -print0 | xargs -0 protoc --python_out=tensorflow_checkpoint_reader/pb --proto_path=tensorflow_checkpoint_reader/pb
+
+# let's try this solution:
+# https://github.com/protocolbuffers/protobuf/issues/1491#issuecomment-977985256
+# pip3 install protoletariat
+#
+set -ex
+find . -type f -name '*.proto' -print0 | xargs -0 protol --in-place --python-out tensorflow_checkpoint_reader/pb protoc --proto-path=tensorflow_checkpoint_reader/pb
