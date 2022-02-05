@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tensorflow-checkpoint-reader"
-version = "0.1.1"
+version = "0.1.2"
 homepage = "https://github.com/shawwn/tensorflow-checkpoint-reader"
 description = "Tensorflow's CheckpointReader in pure python"
 authors = ["Shawn Presser"]
