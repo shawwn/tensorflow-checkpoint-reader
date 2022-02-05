@@ -10,6 +10,7 @@ packages = [{include = "tensorflow_checkpoint_reader"}]
 
 [tool.poetry.dependencies]
 python = "^3.6"
+protobuf = "^3.19.4"
 
 [build-system]
 requires = ["setuptools", "poetry-core"]
