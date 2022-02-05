@@ -49,7 +49,7 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['protobuf>=3.19.4,<4.0.0']
+['protobuf<3.19']
 
 setup_kwargs = {
     'name': 'tensorflow-checkpoint-reader',
