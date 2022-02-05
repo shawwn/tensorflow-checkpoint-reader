@@ -12,8 +12,13 @@ packages = [{include = "tensorflow_checkpoint_reader"}]
 python = "^3.6"
 protobuf = "^3.19.4"
 
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+pytest-cov = "^3.0.0"
+python-semantic-release = "^7.24.0"
+
 [build-system]
-requires = ["setuptools", "poetry-core"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.urls]
@@ -21,3 +26,13 @@ build-backend = "poetry.core.masonry.api"
 "Support me on Patreon" = "https://www.patreon.com/shawwn"
 "@theshawwn on Twitter" = "https://www.twitter.com/theshawwn"
 "sillysaurusx on Hacker News" = "https://news.ycombinator.com/threads?id=sillysaurusx"
+
+[tool.semantic_release]
+version_variable = "pyproject.toml:version"
+branch = "main"
+include_additional_files = "setup.py"
+major_on_zero = false
+build_command = "poetry build"              # build dists
+dist_path = "dist/"                         # where to put dists
+upload_to_pypi = false                      # don't auto-upload to PyPI
+remove_dist = false                         # don't remove dists
