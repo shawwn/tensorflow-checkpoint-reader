@@ -162,7 +162,7 @@ _TYPE_TO_NP = {
   # NOTE(touts): For strings we use np.object as it supports variable length
   # strings.
   types_pb2.DT_STRING:
-    np.object,
+    np.object_,
   types_pb2.DT_COMPLEX64:
     np.complex64,
   types_pb2.DT_COMPLEX128:
@@ -204,7 +204,7 @@ _TYPE_TO_NP = {
   types_pb2.DT_INT8_REF:
     np.int8,
   types_pb2.DT_STRING_REF:
-    np.object,
+    np.object_,
   types_pb2.DT_COMPLEX64_REF:
     np.complex64,
   types_pb2.DT_COMPLEX128_REF:
@@ -214,7 +214,7 @@ _TYPE_TO_NP = {
   types_pb2.DT_UINT64_REF:
     np.uint64,
   types_pb2.DT_BOOL_REF:
-    np.bool,
+    np.bool_,
   types_pb2.DT_QINT8_REF:
     _np_qint8,
   types_pb2.DT_QUINT8_REF:
@@ -289,7 +289,7 @@ def data_type_to_numpy_dtype(type: types_pb2.DataType) -> Tuple[errors.Status, O
 #   elif type == types_pb2.DT_INT64:
 #     dtype = np.int64
 #   elif type == types_pb2.DT_BOOL:
-#     dtype = np.bool
+#     dtype = np.bool_
 #   # elif type == types_pb2.DT_QINT8:
 #   #   dtype = np.qint8
 #   # elif type == types_pb2.DT_QUINT8:
