@@ -1,6 +1,7 @@
 import struct
 import re
 import functools
+import numpy as np
 
 @functools.total_ordering
 class StringPiece:
@@ -49,6 +50,13 @@ class StringPiece:
       self._ptr = other._ptr
       self._length = other._length
       self._offset = other._offset
+    elif isinstance(other, memoryview):
+      assert other.contiguous
+      assert other.readonly
+      other = other.cast('b')
+      self._ptr = other
+      self._length = other.nbytes
+      self._offset = 0
     else:
       raise TypeError("Expected stringlike")
 
@@ -175,9 +183,18 @@ class StringPiece:
     r.advance(other)
     return r
 
+  def same(self, other):
+    if isinstance(other, StringPiece):
+      if other._ptr is self._ptr:
+        return True
+      if isinstance(self._ptr, memoryview):
+        if other._ptr == self._ptr:
+          return True
+    return False
+
   def __sub__(self, other):
     if isinstance(other, StringPiece):
-      if other._ptr is not self._ptr:
+      if not self.same(other):
         raise ValueError("Can only subtract pointers to same underlying data")
       return self._offset - other._offset
     r = StringPiece(self)
@@ -185,16 +202,14 @@ class StringPiece:
     return r
 
   def __eq__(self, other):
-    if isinstance(other, StringPiece):
-      if other._ptr is self._ptr:
-        if other._offset == self._offset:
-          return other._length == self._length
+    if self.same(other):
+      if other._offset == self._offset:
+        return other._length == self._length
     return False
 
   def __lt__(self, other):
-    if isinstance(other, StringPiece):
-      if other._ptr is self._ptr:
-        return self._offset < other._offset
+    if self.same(other):
+      return self._offset < other._offset
     return False
 
   def __bool__(self):
