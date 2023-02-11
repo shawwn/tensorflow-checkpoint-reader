@@ -274,3 +274,40 @@ def decode_fixed_64(buffer, offset=0):
 
 def decode_fixed_32(buffer, offset=0):
   return struct.unpack_from('<L', buffer, offset=offset)[0]
+
+
+#static const uint32 kMaskDelta = 0xa282ead8ul;
+kMaskDelta = 0xa282ead8
+
+class crc32c:
+  # // Return a masked representation of crc.
+  # //
+  # // Motivation: it is problematic to compute the CRC of a string that
+  # // contains embedded CRCs.  Therefore we recommend that CRCs stored
+  # // somewhere (e.g., in files) should be masked before being stored.
+  # inline uint32 Mask(uint32 crc) {
+  #   // Rotate right by 15 bits and add a constant.
+  #   return ((crc >> 15) | (crc << 17)) + kMaskDelta;
+  # }
+  @staticmethod
+  def Mask(crc: int):
+    """Return a masked representation of crc.
+
+    Motivation: it is problematic to compute the CRC of a string that
+    contains embedded CRCs.  Therefore we recommend that CRCs stored
+    somewhere (e.g., in files) should be masked before being stored."""
+    crc = np.uint32(crc)
+    # Rotate right by 15 bits and add a constant.
+    return ((crc >> 15) | (crc << 17)) + kMaskDelta
+
+  # // Return the crc whose masked representation is masked_crc.
+  # inline uint32 Unmask(uint32 masked_crc) {
+  #   uint32 rot = masked_crc - kMaskDelta;
+  #   return ((rot >> 17) | (rot << 15));
+  # }
+  @staticmethod
+  def Unmask(masked_crc: int):
+    """Return the crc whose masked representation is masked_crc."""
+    masked_crc = np.uint32(masked_crc)
+    rot = masked_crc - kMaskDelta
+    return ((rot >> 17) | (rot << 15))
