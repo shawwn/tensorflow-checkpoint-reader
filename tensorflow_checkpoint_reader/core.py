@@ -2,6 +2,7 @@ import struct
 import re
 import functools
 import numpy as np
+import zlib
 
 @functools.total_ordering
 class StringPiece:
@@ -277,9 +278,21 @@ def decode_fixed_32(buffer, offset=0):
 
 
 #static const uint32 kMaskDelta = 0xa282ead8ul;
-kMaskDelta = 0xa282ead8
+kMaskDelta = np.uint32(0xa282ead8)
 
 class crc32c:
+  @staticmethod
+  def extend(init_crc: int, data, n: int) -> int:
+    """Return the crc32c of concat(A, data[0,n-1]) where init_crc is the
+    crc32c of some string A.  Extend() is often used to maintain the
+    crc32c of a stream of data."""
+    return zlib.crc32(data[:n], init_crc)
+
+  @staticmethod
+  def value(data, n: int) -> int:
+    """Return the crc32c of data[0,n-1]"""
+    return crc32c.extend(0, data, n)
+
   # // Return a masked representation of crc.
   # //
   # // Motivation: it is problematic to compute the CRC of a string that
@@ -290,7 +303,7 @@ class crc32c:
   #   return ((crc >> 15) | (crc << 17)) + kMaskDelta;
   # }
   @staticmethod
-  def Mask(crc: int):
+  def mask(crc: int):
     """Return a masked representation of crc.
 
     Motivation: it is problematic to compute the CRC of a string that
@@ -298,7 +311,7 @@ class crc32c:
     somewhere (e.g., in files) should be masked before being stored."""
     crc = np.uint32(crc)
     # Rotate right by 15 bits and add a constant.
-    return ((crc >> 15) | (crc << 17)) + kMaskDelta
+    return np.uint32(((crc >> 15) | (crc << 17)) + kMaskDelta)
 
   # // Return the crc whose masked representation is masked_crc.
   # inline uint32 Unmask(uint32 masked_crc) {
@@ -306,8 +319,8 @@ class crc32c:
   #   return ((rot >> 17) | (rot << 15));
   # }
   @staticmethod
-  def Unmask(masked_crc: int):
+  def unmask(masked_crc: int):
     """Return the crc whose masked representation is masked_crc."""
     masked_crc = np.uint32(masked_crc)
     rot = masked_crc - kMaskDelta
-    return ((rot >> 17) | (rot << 15))
+    return np.uint32((rot >> 17) | (rot << 15))
