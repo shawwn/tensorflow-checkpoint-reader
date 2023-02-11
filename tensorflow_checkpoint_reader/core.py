@@ -25,6 +25,9 @@ class StringPiece:
   def memoryview(self) -> memoryview:
     return memoryview(self.slice())
 
+  def rfind(self, sub: bytes, start: int = None, end: int = None) -> int:
+    return self.bytes().rfind(sub, start, end)
+
   def set(self, other):
     if other is None:
       self._ptr = bytearray()
@@ -49,16 +52,32 @@ class StringPiece:
     else:
       raise TypeError("Expected stringlike")
 
-  def at(self, pos: int):
-    assert 0 <= pos < self._length
-    return self._ptr[self._offset + pos]
+  def at(self, pos: int, *value):
+    if isinstance(pos, slice):
+      start, stop, stride = pos.indices(self._length)
+      assert 0 <= start < self._length
+      assert 0 <= stop <= self._length
+      assert stop > start
+      assert stride == 1
+      if value:
+        value, = value
+        assert len(value) == (stop - start)
+        self._ptr[self._offset + start:self._offset + stop] = value
+      else:
+        return self._ptr[self._offset + start:self._offset + stop]
+    else:
+      assert 0 <= pos < self._length
+      if value:
+        value, = value
+        self._ptr[self._offset + pos] = value
+      else:
+        return self._ptr[self._offset + pos]
 
   def __getitem__(self, item):
     return self.at(item)
 
   def __setitem__(self, pos, value):
-    assert 0 <= pos < self._length
-    self._ptr[self._offset + pos] = value
+    return self.at(pos, value)
 
   def length(self) -> int:
     """Returns the number of characters in the `string_view`."""
