@@ -148,7 +148,6 @@ class FileSystem(ABC):
   def new_random_access_file(self, name) -> Tuple[errors.Status, Optional[RandomAccessFile]]:
     return errors.Unimplemented("This filesystem does not support new_random_access_file()"), None
 
-  @abstractmethod
   def has_atomic_move(self, name) -> Tuple[errors.Status, bool]:
     return errors.Status.OK(), True
 
