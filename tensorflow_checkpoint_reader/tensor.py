@@ -1,6 +1,8 @@
 from .pb.tensorflow.core.framework import types_pb2
 from . import tensor_shape
 from . import errors
+from . import numpy_util
+from . import core
 
 from typing import Tuple, Optional
 
@@ -12,15 +14,33 @@ class TensorBuffer:
     self._data = data
     self._array_offset = array_offset
     self._order = order
+    # verify our data is OK; this runs various assertions.
+    self.data()
 
-  def data(self):
-    return self._data
+  def data(self) -> Optional[memoryview]:
+    data = self._data
+    if data is None:
+      return data
+    # try to get a JAX Array as a numpy array
+    if hasattr(data, '_value'):
+      data = data._value
+    if isinstance(data, np.ndarray):
+      data = data.data
+    if isinstance(data, memoryview):
+      assert data.contiguous, "memory must be contiguous"
+      assert data.c_contiguous, "memory must be C contiguous"
+    return data
 
   def array_offset(self):
     return self._array_offset
 
   def order(self):
     return self._order
+
+  def total_bytes(self) -> int:
+    if (data := self.data()) is None:
+      return 0
+    return data.nbytes
 
 
 class Tensor:
@@ -34,6 +54,13 @@ class Tensor:
     self._shape = shape
     self._buf = buf
 
+  @classmethod
+  def from_array(cls, array):
+    type = errors.raise_if_error(numpy_util.numpy_dtype_to_data_type(array.dtype))
+    shape = tensor_shape.TensorShape.from_dims(array.shape)
+    buf = TensorBuffer(array)
+    return cls(type=type, shape=shape, buf=buf)
+
   def __repr__(self):
     return f"Tensor(is_initialized={self.is_initialized()}, shape={self.shape()!r})"
 
@@ -41,7 +68,7 @@ class Tensor:
     return self._shape
 
   def dtype(self) -> types_pb2.DataType:
-    return self._shape.data_type()
+    return self.shape().data_type()
 
   def dims(self) -> int:
     return self.shape().dims()
@@ -61,6 +88,28 @@ class Tensor:
 
   def set_data(self, buf: TensorBuffer):
     self._buf = buf
+
+  def tensor_data(self) -> core.StringPiece:
+    if self._buf is None:
+      # Don't die for empty tensors
+      return core.StringPiece()
+    # return StringPiece(static_cast<char*>(buf_->data()), TotalBytes());
+    return core.StringPiece(self._buf.data(), self.total_bytes())
+
+  # size_t Tensor::TotalBytes() const {
+  #   if (shape_.num_elements() == 0) return 0;
+  #   CHECK(buf_) << "null buf_ with non-zero shape size " << shape_.num_elements();
+  #   CASES(dtype(), return Helper<T>::TotalBytes(buf_, shape_.num_elements()));
+  #   return 0;  // Makes compiler happy.
+  # }
+  def total_bytes(self) -> int:
+    numel = self._shape.num_elements()
+    if numel == 0:
+      return 0
+    assert self._buf is not None, "null _buf with non-zero shape size"
+    # elemsize = np.dtype(self.shape().dtype()).itemsize
+    # return elemsize * numel
+    return self._buf.total_bytes()
 
   def to_py(self) -> Tuple[errors.Status, Optional[np.ndarray]]:
     if not self.is_initialized():
