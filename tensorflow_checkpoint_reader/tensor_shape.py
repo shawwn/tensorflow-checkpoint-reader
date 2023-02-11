@@ -7,6 +7,12 @@ from . import numpy_util
 
 import numpy as np
 
+# // We store the number of dimensions in byte 14, and the RepTag in byte 15.
+# // Bytes [0..13] vary depending on the representation.
+# // A value of 255 indicates unknown rank in the PartialTensorShape case.
+# static constexpr uint8 kUnknownRank = 255;
+kUnknownRank = 255
+
 class TensorShape:
   def __init__(self, data_type: types_pb2.DataType = types_pb2.DT_INVALID):
     self._dims = []
@@ -21,10 +27,22 @@ class TensorShape:
 
   @classmethod
   def from_proto(cls, proto: tensor_shape_pb2.TensorShapeProto):
-    self = cls()
+    self = PartialTensorShape() if proto.unknown_rank else cls()
     dims = [dim.size for dim in proto.dim]
     errors.raise_if_error(self.init_dims(dims))
     return self
+
+  def as_proto(self, proto: tensor_shape_pb2.TensorShapeProto):
+    proto.Clear()
+    if self.unknown_rank():
+      proto.unknown_rank = True
+    else:
+      for i in range(self.dims()):
+        dim = proto.dim.add()
+        dim.size = self.dim_size(i)
+
+  def unknown_rank(self):
+    return isinstance(self, PartialTensorShape) and self.ndims_byte() == kUnknownRank
 
   def to_list(self):
     return tuple(self._dims)
@@ -108,5 +126,8 @@ class TensorShape:
     self.set_num_elements(new_num_elements)
 
 
-    
+class PartialTensorShape(TensorShape):
+  def ndims_byte(self) -> int:
+    return kUnknownRank
+
     
