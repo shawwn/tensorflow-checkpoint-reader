@@ -1,8 +1,9 @@
 import os
+import io as _io
 import stat
 import errno as _errno
 from abc import ABC
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, cast as _cast
 
 from . import file_system
 from . import file_statistics
@@ -72,6 +73,51 @@ class PosixRandomAccessFile(file_system.RandomAccessFile):
     result = core.StringPiece(dst)
     return s, result
 
+class PosixWritableFile(file_system.WritableFile):
+  def __init__(self, fname, file: _io.BufferedWriter):
+    self._filename = core.string_view(fname).bytes()
+    self._file = file
+
+  def __repr__(self):
+    return f"PosixWritableFile(file={self._file!r}, filename={self._filename!r})"
+
+  def append(self, data: core.StringPiece) -> errors.Status:
+    r = self._file.write(data.bytes())
+    if r != data.size():
+      import ctypes
+      errno = ctypes.get_errno()
+      return errors.IOError(self._filename, errno)
+    return errors.Status.OK()
+
+  def name(self) -> Tuple[errors.Status, bytes]:
+    return errors.Status.OK(), self._filename
+
+  def close(self) -> errors.Status:
+    if self._file is None:
+      return errors.IOError(self._filename, _errno.EBADF)
+    self._file.close()
+    self._file = None
+    return errors.Status.OK()
+
+  def flush(self) -> errors.Status:
+    try:
+      self._file.flush()
+      return errors.Status.OK()
+    except IOError as e:
+      return errors.IOError(self._filename, e.errno)
+
+  def sync(self) -> errors.Status:
+    try:
+      self._file.flush()
+      return errors.Status.OK()
+    except IOError as e:
+      return errors.IOError(self._filename, e.errno)
+
+  def tell(self) -> Tuple[errors.Status, int]:
+    try:
+      return errors.Status.OK(), self._file.tell()
+    except IOError as e:
+      return errors.IOError(self._filename, e.errno), -1
 
 class PosixFileSystem(file_system.FileSystem, ABC):
   def new_random_access_file(self, name) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
@@ -87,6 +133,15 @@ class PosixFileSystem(file_system.FileSystem, ABC):
     else:
       result = PosixRandomAccessFile(fname, fd)
       return errors.Status.OK(), result
+
+  def new_writable_file(self, name) -> Tuple[errors.Status, Optional[file_system.WritableFile]]:
+    fname = self.translate_name(name)
+    try:
+      file = open(fname, "wb")
+      result = PosixWritableFile(fname, _cast(file, _io.BufferedWriter))
+      return errors.Status.OK(), result
+    except IOError as e:
+      return errors.IOError(fname, e.errno), None
 
   def file_exists(self, name) -> errors.Status:
     fname = self.translate_name(name)

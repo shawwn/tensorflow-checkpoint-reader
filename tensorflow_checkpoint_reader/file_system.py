@@ -43,6 +43,78 @@ class RandomAccessFile(ABC):
   def __del__(self):
     errors.raise_if_error(self.close())
 
+class WritableFile(ABC):
+  """A file abstraction for sequential writing.
+
+  The implementation must provide buffering since callers may append
+  small fragments at a time to the file."""
+
+  def name(self) -> Tuple[errors.Status, core.StringPiece]:
+    """Returns the name of the file.
+
+    This is an optional operation that may not be implemented by every
+    filesystem."""
+    return errors.Unimplemented("This filesystem does not support name()"), core.StringPiece()
+
+  @abstractmethod
+  def close(self) -> errors.Status:
+    """Close the file.
+
+    Flush() and de-allocate resources associated with this file
+
+    Typical return codes (not guaranteed to be exhaustive):
+     * OK
+     * Other codes, as returned from Flush()
+    """
+    return errors.Unimplemented("This filesystem does not support close()")
+
+  @abstractmethod
+  def append(self, data: core.StringPiece) -> errors.Status:
+    """Append 'data' to the file."""
+    return errors.Unimplemented("This filesystem does not support append()")
+
+  @abstractmethod
+  def flush(self) -> errors.Status:
+    """Flushes the file and optionally syncs contents to filesystem.
+
+    This should flush any local buffers whose contents have not been
+    delivered to the filesystem.
+
+    If the process terminates after a successful flush, the contents
+    may still be persisted, since the underlying filesystem may
+    eventually flush the contents.  If the OS or machine crashes
+    after a successful flush, the contents may or may not be
+    persisted, depending on the implementation.
+    """
+    return errors.Unimplemented("This filesystem does not support flush()")
+
+  @abstractmethod
+  def sync(self) -> errors.Status:
+    """Syncs contents of file to filesystem.
+
+    This waits for confirmation from the filesystem that the contents
+    of the file have been persisted to the filesystem; if the OS
+    or machine crashes after a successful Sync, the contents should
+    be properly saved."""
+    return errors.Unimplemented("This filesystem does not support sync()")
+
+  @abstractmethod
+  def tell(self) -> Tuple[errors.Status, int]:
+    """Retrieves the current write position in the file, or -1 on error.
+
+    This is an optional operation, subclasses may choose to return
+    errors::Unimplemented.
+    """
+    return errors.Unimplemented("This filesystem does not support tell()"), -1
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *args):
+    errors.raise_if_error(self.close())
+
+  def __del__(self):
+    errors.raise_if_error(self.close())
 
 class FileSystem(ABC):
   def parse_uri(self, name) -> Tuple[core.StringPiece, core.StringPiece, core.StringPiece]:
@@ -64,7 +136,7 @@ class FileSystem(ABC):
     # If `path` becomes empty, return `/` (`file://` should be `/`), not `.`.
     if path.empty():
       return b"/"
-    
+
     return self.clean_path(path)
 
   def clean_path(self, name) -> bytes:
@@ -75,6 +147,10 @@ class FileSystem(ABC):
   @abstractmethod
   def new_random_access_file(self, name) -> Tuple[errors.Status, Optional[RandomAccessFile]]:
     return errors.Unimplemented("This filesystem does not support new_random_access_file()"), None
+
+  @abstractmethod
+  def has_atomic_move(self, name) -> Tuple[errors.Status, bool]:
+    return errors.Status.OK(), True
 
   @abstractmethod
   def get_file_size(self, name) -> Tuple[errors.Status, int]:

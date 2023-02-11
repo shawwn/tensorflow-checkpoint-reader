@@ -87,6 +87,22 @@ class Env(ABC):
                                   "' not implemented (file: '", fname, "')"), None
     return errors.Status.OK(), file_system
 
+  def has_atomic_move(self, path: bytes) -> Tuple[errors.Status, bool]:
+    """Returns whether the given path is on a file system
+    that has atomic move capabilities. This can be used
+    to determine if there needs to be a temp location to safely write objects.
+    The second boolean argument has_atomic_move contains this information.
+
+    Returns one of the following status codes (not guaranteed exhaustive):
+     * OK - The path is on a recognized file system,
+            so has_atomic_move holds the above information.
+     * UNIMPLEMENTED - The file system of the path hasn't been implemented in TF
+    """
+    err, fs = self.get_file_system_for_file(path)
+    if not err.ok():
+      return err, False
+    return fs.has_atomic_move(path)
+
   def get_file_size(self, fname) -> Tuple[errors.Status, int]:
     err, fs = self.get_file_system_for_file(fname)
     if not err.ok():
