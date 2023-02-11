@@ -238,12 +238,19 @@ _PYTHON_TO_TYPE = {
   builtins.bytes: types_pb2.DT_STRING,
 }
 
+def numpy_dtype_to_data_type(dtype) -> Tuple[errors.Status, Optional[int]]:
+  dtype = np.dtype(dtype).type
+  if dtype in _NP_TO_TYPE:
+    return errors.Status.OK(), _NP_TO_TYPE[dtype]
+  else:
+    return errors.Unimplemented("Can't convert numpy dtype ", dtype, " to data type"), None
+
 def data_type_to_numpy_dtype(type: types_pb2.DataType) -> Tuple[errors.Status, Optional[np.dtype]]:
   if type in _TYPE_TO_NP:
     return errors.Status.OK(), _TYPE_TO_NP[type]
   else:
     return errors.Unimplemented("Can't convert data type ", _TYPE_TO_STRING.get(type, type), " to numpy dtype"), None
-#
+
 # def data_type_to_numpy_dtype_old(type: types_pb2.DataType) -> Tuple[errors.Status, Optional[np.dtype]]:
 #   # DT_INVALID = 0
 #   # DT_FLOAT = 1
