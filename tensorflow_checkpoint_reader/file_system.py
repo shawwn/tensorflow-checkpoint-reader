@@ -148,6 +148,10 @@ class FileSystem(ABC):
   def new_random_access_file(self, name) -> Tuple[errors.Status, Optional[RandomAccessFile]]:
     return errors.Unimplemented("This filesystem does not support new_random_access_file()"), None
 
+  @abstractmethod
+  def new_writable_file(self, name) -> Tuple[errors.Status, Optional[WritableFile]]:
+    return errors.Unimplemented("This filesystem does not support new_writable_file()"), None
+
   def has_atomic_move(self, name) -> Tuple[errors.Status, bool]:
     return errors.Status.OK(), True
 

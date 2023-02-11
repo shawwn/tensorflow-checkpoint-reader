@@ -115,6 +115,12 @@ class Env(ABC):
       return err, None
     return fs.new_random_access_file(fname)
 
+  def new_writable_file(self, fname) -> Tuple[errors.Status, Optional[file_system.WritableFile]]:
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err, None
+    return fs.new_writable_file(fname)
+
   def get_registered_file_system_schemes(self, schemes: List[bytes]) -> errors.Status:
     """Returns the file system schemes registered for this Env."""
     return self._file_system_registry.get_registered_file_system_schemes(schemes)

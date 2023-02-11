@@ -138,7 +138,7 @@ class PosixFileSystem(file_system.FileSystem, ABC):
     fname = self.translate_name(name)
     try:
       file = open(fname, "wb")
-      result = PosixWritableFile(fname, _cast(file, _io.BufferedWriter))
+      result = PosixWritableFile(fname, _cast(_io.BufferedWriter, file))
       return errors.Status.OK(), result
     except IOError as e:
       return errors.IOError(fname, e.errno), None
