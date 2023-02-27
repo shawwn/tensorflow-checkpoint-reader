@@ -1,11 +1,12 @@
+from __future__ import annotations
 import os
 import io as _io
 import stat
 import errno as _errno
-from abc import ABC
 from typing import List, Tuple, Optional, cast as _cast
 
 from . import file_system
+from . import file_system_helper
 from . import file_statistics
 from . import errors
 from . import core
@@ -128,7 +129,7 @@ class PosixWritableFile(file_system.WritableFile):
     except IOError as e:
       return errors.IOError(self._filename, e.errno), -1
 
-class PosixFileSystem(file_system.FileSystem, ABC):
+class PosixFileSystem(file_system.FileSystem):
   def new_random_access_file(self, name) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
     fname = self.translate_name(name)
     try:
@@ -159,11 +160,21 @@ class PosixFileSystem(file_system.FileSystem, ABC):
     except IOError as e:
       return errors.IOError(src, e.errno)
 
-  def file_exists(self, name) -> errors.Status:
-    fname = self.translate_name(name)
-    if os.access(fname, os.F_OK):
+  def delete_file(self, name) -> errors.Status:
+    try:
+      os.unlink(self.translate_name(name))
+      return errors.Status.OK()
+    except IOError as e:
+      return errors.IOError(name, e.errno)
+
+  def file_exists(self, fname) -> errors.Status:
+    if os.access(self.translate_name(fname), os.F_OK):
       return errors.Status.OK()
     return errors.NotFound(fname, " not found")
+
+  def get_matching_paths(self, pattern) -> Tuple[errors.Status, Optional[List]]:
+    from . import env # import here due to circular import
+    return file_system_helper.get_matching_paths(self, env.Env.default(), pattern)
 
   def stat(self, name, stats: file_statistics.FileStatistics) -> errors.Status:
     fname = self.translate_name(name)

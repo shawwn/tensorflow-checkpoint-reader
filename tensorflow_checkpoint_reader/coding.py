@@ -14,7 +14,7 @@ from . import strings
 #   }
 # }
 def encode_fixed16(value):
-  value = np.uint16(value)
+  value = int(np.uint16(value))
   return struct.pack("=H", value)
 
 # void EncodeFixed32(char* buf, uint32 value) {
@@ -28,7 +28,7 @@ def encode_fixed16(value):
 #   }
 # }
 def encode_fixed32(value):
-  value = np.uint32(value)
+  value = int(np.uint32(value))
   return struct.pack("=L", value)
 
 # void EncodeFixed64(char* buf, uint64 value) {
@@ -46,7 +46,7 @@ def encode_fixed32(value):
 #   }
 # }
 def encode_fixed64(value):
-  value = np.uint64(value)
+  value = int(np.uint64(value))
   return struct.pack("=Q", value)
 
 # void PutFixed16(string* dst, uint16 value) {
@@ -104,7 +104,7 @@ def put_fixed64(dst: bytearray, value):
 #   return reinterpret_cast<char*>(ptr);
 # }
 def encode_varint32(v):
-  v = np.uint32(v)
+  v = int(np.uint32(v))
   ptr = bytearray()
   def add(i):
     ptr.append(int(i) & 0xFF)
@@ -172,7 +172,7 @@ def put_varint32(dst: bytearray, v):
 #   return reinterpret_cast<char*>(ptr);
 # }
 def encode_varint64(v):
-  v = np.uint64(v)
+  v = int(np.uint64(v))
   B = 128
   ptr = bytearray()
   def add(i):
@@ -207,7 +207,7 @@ def put_varint64(dst: bytearray, v):
 #   return len;
 # }
 def varint_length(v):
-  v = np.uint64(v)
+  v = int(np.uint64(v))
   length = 1
   while v >= 128:
     v >>= 7

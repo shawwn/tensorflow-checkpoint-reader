@@ -2,7 +2,6 @@ from typing import Callable, Optional, List, Tuple
 from fnmatch import fnmatch
 from abc import ABC, abstractmethod
 import os
-import stat
 
 from . import errors
 from . import core
@@ -164,8 +163,39 @@ class FileSystem(ABC):
     return errors.Status.OK(), 0
 
   @abstractmethod
+  def delete_file(self, name) -> errors.Status:
+    return errors.Status.OK()
+
+  @abstractmethod
   def file_exists(self, name) -> errors.Status:
     return errors.Status.OK()
+
+  @abstractmethod
+  def get_matching_paths(self, pattern) -> Tuple[errors.Status, Optional[List]]:
+    """Given a pattern, stores in *results the set of paths that matches
+    that pattern. *results is cleared.
+
+    pattern must match all of a name, not just a substring.
+
+    pattern: { term }
+    term:
+      '*': matches any sequence of non-'/' characters
+      '?': matches a single non-'/' character
+      '[' [ '^' ] { match-list } ']':
+           matches any single character (not) on the list
+      c: matches character c (c != '*', '?', '\\', '[')
+      '\\' c: matches character c
+    character-range:
+      c: matches character c (c != '\\', '-', ']')
+      '\\' c: matches character c
+      lo '-' hi: matches character c for lo <= c <= hi
+
+    Typical return codes:
+     * OK - no errors
+     * UNIMPLEMENTED - Some underlying functions (like GetChildren) are not
+                       implemented
+    """
+    return errors.Status.OK(), []
 
   @abstractmethod
   def stat(self, name, stats: file_statistics.FileStatistics) -> errors.Status:

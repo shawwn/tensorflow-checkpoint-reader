@@ -6,6 +6,7 @@ from typing import List
 #import tensorflow_checkpoint_reader.core as core
 from . import core
 from . import coding
+from . import strings
 
 class BlockBuilder:
   #  // Reset the contents as if the BlockBuilder was just constructed.
@@ -235,7 +236,7 @@ class BlockBuilder:
     # last_key_.append(key.data() + shared, non_shared);
     # assert(StringPiece(last_key_) == key);
     # counter_++;
-    self.last_key_ = bytearray(shared)
+    strings.resize(self.last_key_, shared)
     self.last_key_.extend(key[shared:][:non_shared])
     assert core.StringPiece(self.last_key_) == key
     self.counter_ += 1

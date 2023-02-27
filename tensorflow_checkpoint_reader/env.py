@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC
 from typing import Callable, List, Optional, Dict, NamedTuple, Tuple, Union
 from functools import wraps as _wraps
@@ -5,6 +6,7 @@ import threading as _threading
 import os as _os
 
 from . import file_system
+from . import file_statistics
 from . import errors
 from . import misc
 from . import core
@@ -62,7 +64,7 @@ class Env(ABC):
     self._file_system_registry = FileSystemRegistryImpl()
 
   @classmethod
-  def default(cls):
+  def default(cls) -> Env:
     """Returns a default environment suitable for the current operating
     system.
 
@@ -86,6 +88,17 @@ class Env(ABC):
       return errors.Unimplemented("File system scheme '", scheme,
                                   "' not implemented (file: '", fname, "')"), None
     return errors.Status.OK(), file_system
+
+  def stat(self, fname: bytes) -> Tuple[errors.Status, Optional[file_statistics.FileStatistics]]:
+    """Obtains statistics for the given path."""
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err, None
+    stats = file_statistics.FileStatistics()
+    err = fs.stat(fname, stats)
+    if not err.ok():
+      return err, None
+    return err, stats
 
   def has_atomic_move(self, path: bytes) -> Tuple[errors.Status, bool]:
     """Returns whether the given path is on a file system
@@ -167,6 +180,27 @@ class Env(ABC):
     if not err.ok():
       return err, None
     return fs.new_writable_file(fname)
+
+  def file_exists(self, fname) -> errors.Status:
+    """Returns OK if the named path exists and NOT_FOUND otherwise."""
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err
+    return fs.file_exists(fname)
+
+  # virtual Status GetMatchingPaths(const std::string& pattern,
+  #                                 std::vector<string>* results);
+  def get_matching_paths(self, pattern) -> Tuple[errors.Status, Optional[List]]:
+    """Given a pattern, stores in *results the set of paths that matches
+    that pattern. *results is cleared.
+
+    More details about `pattern` in FileSystem::GetMatchingPaths.
+    """
+    err, fs = self.get_file_system_for_file(pattern)
+    if not err.ok():
+      return err, None
+    return fs.get_matching_paths(pattern)
+
 
   def delete_file(self, fname) -> errors.Status:
     """Deletes the named file."""
