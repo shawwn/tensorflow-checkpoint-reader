@@ -78,10 +78,19 @@ class PosixWritableFile(file_system.WritableFile):
     self._filename = core.string_view(fname).bytes()
     self._file = file
 
+  def __del__(self):
+    # if (file_ != nullptr) {
+    if self._file is not None:
+      # // Ignoring any potential errors
+      # fclose(file_);
+      self._file.close()
+    # }
+
   def __repr__(self):
     return f"PosixWritableFile(file={self._file!r}, filename={self._filename!r})"
 
-  def append(self, data: core.StringPiece) -> errors.Status:
+  def append(self, data) -> errors.Status:
+    data = core.string_view(data)
     r = self._file.write(data.bytes())
     if r != data.size():
       import ctypes
@@ -142,6 +151,13 @@ class PosixFileSystem(file_system.FileSystem, ABC):
       return errors.Status.OK(), result
     except IOError as e:
       return errors.IOError(fname, e.errno), None
+
+  def rename_file(self, src, target) -> errors.Status:
+    try:
+      os.rename(self.translate_name(src), self.translate_name(target))
+      return errors.Status.OK()
+    except IOError as e:
+      return errors.IOError(src, e.errno)
 
   def file_exists(self, name) -> errors.Status:
     fname = self.translate_name(name)

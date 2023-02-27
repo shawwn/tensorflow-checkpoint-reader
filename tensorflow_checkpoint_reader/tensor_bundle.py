@@ -7,6 +7,10 @@ from . import tensor
 from . import tensor_shape
 from . import file_system
 from . import file_system_helper
+from . import random
+from . import port
+from . import table_options
+from . import table_builder
 from .pb.tensorflow.core.protobuf import tensor_bundle_pb2
 from .pb.tensorflow.core.framework import types_pb2
 
@@ -21,7 +25,7 @@ import dataclasses
 # const int kTensorBundleVersion = 1;
 kTensorBundleMinProducer = 0
 kTensorBundleMinConsumer = 0
-kTensorBundleVersion = 0
+kTensorBundleVersion = 1
 
 # // Size of our input buffer for streaming reads
 # static const int kBufferSize = 1024 * 1024;
@@ -91,7 +95,9 @@ class FileOutputBuffer:
 
   def close(self) -> errors.Status:
     """Appends the buffered data, then closes the underlying file."""
-    errors.raise_if_error(self._flush_buffer(closing=False))
+    status = self._flush_buffer(closing=False)
+    if not status.ok():
+      return status
     return self._file.close()
 
   def _flush_buffer(self, closing: bool) -> errors.Status:
@@ -192,7 +198,7 @@ class BundleWriter:
     self._size = 0
     self._status = errors.Status.OK()
     self._entries: Dict[bytes, tensor_bundle_pb2.BundleEntryProto] = {}
-    assert errors.raise_if_error(env_.has_atomic_move(prefix.bytes()))
+    self._use_temp_file = errors.raise_if_error(env_.has_atomic_move(prefix.bytes()))
 
     # data_path_ = DataFilename(prefix_, 0, 1);
     # metadata_path_ = MetaFilename(prefix_);
@@ -203,7 +209,9 @@ class BundleWriter:
     #   metadata_path_ =
     #       strings::StrCat(metadata_path_, ".tempstate", random::New64());
     # }
-    print("TODO: use temp file")
+    if self._use_temp_file:
+      self._data_path += f".tempstate{random.new_64()}".encode('utf-8')
+      self._metadata_path += f".tempstate{random.new_64()}".encode('utf-8')
 
     # status_ = env_->CreateDir(string(io::Dirname(prefix_)));
     # if (!status_.ok() && !errors::IsAlreadyExists(status_)) {
@@ -316,7 +324,93 @@ class BundleWriter:
   # Status Finish() TF_MUST_USE_RESULT;
   def finish(self) -> errors.Status:
     """Finishes the writer and flushes."""
-    raise NotImplementedError
+    # if (out_) {
+    #   status_.Update(out_->Close());
+    #   out_ = nullptr;
+    #   if (status_.ok()) {
+    #     if (use_temp_file_) {
+    #       status_ =
+    #           Env::Default()->RenameFile(data_path_, DataFilename(prefix_, 0, 1));
+    #     }
+    #   } else {
+    #     Env::Default()->DeleteFile(data_path_).IgnoreError();
+    #   }
+    # }
+    if self._out is not None:
+      self._status.update(self._out.close())
+      self._out = None
+      if self._status.ok():
+        if self._use_temp_file:
+          self._status = self._env.rename_file(self._data_path, naming.data_filename(self._prefix, 0, 1))
+        else:
+          self._env.delete_file(self._data_path) # ignore error
+    # if (!status_.ok()) return status_;
+    if not self._status.ok():
+      return self._status
+    # // Build key -> BundleEntryProto table.
+    # std::unique_ptr<WritableFile> file;
+    # status_ = env_->NewWritableFile(metadata_path_, &file);
+    self._status, file = self._env.new_writable_file(self._metadata_path)
+    # if (!status_.ok()) return status_;
+    if not self._status.ok():
+      return self._status
+    # {
+    if True:
+      # // N.B.: the default use of Snappy compression may not be supported on all
+      # // platforms (e.g. Android).  The metadata file is small, so this is fine.
+      # table::Options options;
+      # options.compression = table::kNoCompression;
+      options = table_options.Options(compression=table_options.kNoCompression)
+      # table::TableBuilder builder(options, file.get());
+      builder = table_builder.TableBuilder(options, file)
+      # // Header entry.
+      # BundleHeaderProto header;
+      header = tensor_bundle_pb2.BundleHeaderProto()
+      # header.set_num_shards(1);
+      header.num_shards = 1
+      # header.set_endianness(BundleHeaderProto::LITTLE);
+      header.endianness = tensor_bundle_pb2.BundleHeaderProto.LITTLE
+      # if (!port::kLittleEndian) header.set_endianness(BundleHeaderProto::BIG);
+      if not port.kLittleEndian:
+        header.endianness = tensor_bundle_pb2.BundleHeaderProto.BIG
+      # VersionDef* version = header.mutable_version();
+      # version->set_producer(kTensorBundleVersion);
+      header.version.producer = kTensorBundleVersion
+      # version->set_min_consumer(kTensorBundleMinConsumer);
+      header.version.min_consumer = kTensorBundleMinConsumer
+      #
+      # builder.Add(kHeaderEntryKey, header.SerializeAsString());
+      builder.add(kHeaderEntryKey, header.SerializeToString())
+      #
+      # // All others.
+      # for (const auto& p : entries_) {
+      #   builder.Add(p.first, p.second.SerializeAsString());
+      # }
+      for name, value in self._entries.items():
+        builder.add(name, value.SerializeToString())
+      # status_ = builder.Finish();
+      self._status = builder.finish()
+    # }
+    # status_.Update(file->Close());
+    self._status.update(file.close())
+    # if (!status_.ok()) {
+    #   Env::Default()->DeleteFile(metadata_path_).IgnoreError();
+    #   return status_;
+    if not self._status.ok():
+      self._env.delete_file(self._metadata_path) # ignore error
+      return self._status
+    # } else if (use_temp_file_) {
+    #   status_ = Env::Default()->RenameFile(metadata_path_, MetaFilename(prefix_));
+    #   if (!status_.ok()) return status_;
+    # }
+    elif self._use_temp_file:
+      self._status = self._env.rename_file(self._metadata_path, naming.meta_filename(self._prefix))
+      if not self._status.ok():
+        return self._status
+    # status_ = errors::Internal("BundleWriter is closed");
+    self._status = errors.Internal("BundleWriter is closed")
+    # return Status::OK();
+    return errors.Status.OK()
 
   # Status status() const { return status_; }
   def status(self):

@@ -109,17 +109,71 @@ class Env(ABC):
       return err, 0
     return fs.get_file_size(fname)
 
+  def rename_file(self, src, target) -> errors.Status:
+    """Renames file src to target. If target already exists, it will be replaced."""
+    # FileSystem* src_fs;
+    # FileSystem* target_fs;
+    # TF_RETURN_IF_ERROR(GetFileSystemForFile(src, &src_fs));
+    # TF_RETURN_IF_ERROR(GetFileSystemForFile(target, &target_fs));
+    # if (src_fs != target_fs) {
+    #   return errors::Unimplemented("Renaming ", src, " to ", target,
+    #                                " not implemented");
+    # }
+    # return src_fs->RenameFile(src, target);
+    err, src_fs = self.get_file_system_for_file(src)
+    if not err.ok():
+      return err
+    err, target_fs = self.get_file_system_for_file(target)
+    if not err.ok():
+      return err
+    if src_fs is not target_fs:
+      return errors.Unimplemented("Renaming ", src, " to ", target, " not implemented")
+    return src_fs.rename_file(src, target)
+
   def new_random_access_file(self, fname) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
+    """Creates a brand new random access read-only file with the
+    specified name.
+
+    On success, returns OK and a pointer to the new file.
+    On failure returns non-OK and None. If the file does not exist,
+    returns a non-OK status.
+
+    The returned file may be concurrently accessed by multiple threads.
+
+    The ownership of the returned RandomAccessFile is passed to the caller
+    and the object should be deleted when is not used. The file object
+    shouldn't live longer than the Env object.
+    """
     err, fs = self.get_file_system_for_file(fname)
     if not err.ok():
       return err, None
     return fs.new_random_access_file(fname)
 
   def new_writable_file(self, fname) -> Tuple[errors.Status, Optional[file_system.WritableFile]]:
+    """Creates an object that writes to a new file with the specified
+    name.
+
+    Deletes any existing file with the same name and creates a
+    new file.  On success, reutrns OK and a pointer to the new file
+    On failure returns non-OK and None.
+
+    The returned file will only be accessed by one thread at a time.
+
+    The ownership of the returned WritableFile is passed to the caller
+    and the object should be deleted when is not used. The file object
+    shouldn't live longer than the Env object.
+    """
     err, fs = self.get_file_system_for_file(fname)
     if not err.ok():
       return err, None
     return fs.new_writable_file(fname)
+
+  def delete_file(self, fname) -> errors.Status:
+    """Deletes the named file."""
+    err, fs = self.get_file_system_for_file(fname)
+    if not err.ok():
+      return err
+    return fs.delete_file(fname)
 
   def get_registered_file_system_schemes(self, schemes: List[bytes]) -> errors.Status:
     """Returns the file system schemes registered for this Env."""

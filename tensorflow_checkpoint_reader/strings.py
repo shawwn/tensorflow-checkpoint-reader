@@ -1,7 +1,8 @@
 from enum import Enum, auto
 from typing import Union
 
-from . import core, str_util
+from . import core
+from . import str_util
 
 # from fifostr import FIFOStr
 #
@@ -14,8 +15,15 @@ from . import core, str_util
 #     self.clear()
 #     self.append(str(value))
 
+def resize(s: bytearray, size: int):
+  assert size >= 0
+  if len(s) > size:
+    s[:] = s[:size]
+  if len(s) < size:
+    s.extend(bytearray(size - len(s)))
+
 def str_cat(*args):
-  return ''.join([str(x) for x in args])
+  return ''.join([x.decode('utf-8') if hasattr(x, 'decode') else str(x) for x in args])
 
 def printf(format, *args) -> bytes:
   format = core.string_view(format).bytes()

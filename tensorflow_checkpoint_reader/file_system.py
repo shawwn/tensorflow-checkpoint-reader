@@ -156,6 +156,10 @@ class FileSystem(ABC):
     return errors.Status.OK(), True
 
   @abstractmethod
+  def rename_file(self, src, target) -> errors.Status:
+    return errors.Status.OK()
+
+  @abstractmethod
   def get_file_size(self, name) -> Tuple[errors.Status, int]:
     return errors.Status.OK(), 0
 

@@ -53,7 +53,7 @@ class StringPiece:
       self._offset = other._offset
     elif isinstance(other, memoryview):
       assert other.contiguous
-      assert other.readonly
+      # assert other.readonly
       other = other.cast('b')
       self._ptr = other
       self._length = other.nbytes
@@ -64,9 +64,9 @@ class StringPiece:
   def at(self, pos: int, *value):
     if isinstance(pos, slice):
       start, stop, stride = pos.indices(self._length)
-      assert 0 <= start < self._length
+      assert 0 <= start <= self._length
       assert 0 <= stop <= self._length
-      assert stop > start
+      assert stop >= start
       assert stride == 1
       if value:
         value, = value
@@ -203,15 +203,20 @@ class StringPiece:
     return r
 
   def __eq__(self, other):
-    if self.same(other):
-      if other._offset == self._offset:
-        return other._length == self._length
-    return False
+    # if self.same(other):
+    #   if other._offset == self._offset:
+    #     return other._length == self._length
+    # return False
+    return self.slice() == string_view(other).slice()
 
   def __lt__(self, other):
-    if self.same(other):
-      return self._offset < other._offset
-    return False
+    # if self.same(other):
+    #   return self._offset < other._offset
+    # return False
+    return self.slice() < string_view(other).slice()
+
+  def compare(self, other):
+    return int(self > other) - int(self < other)
 
   def __bool__(self):
     return not self.empty()

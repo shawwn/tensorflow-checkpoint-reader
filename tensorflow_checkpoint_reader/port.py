@@ -8,6 +8,7 @@ from . import load_library
 from . import std
 
 kNUMANoAffinity = -1
+kLittleEndian = _sys.byteorder == 'little'
 
 def hostname() -> str:
   return _socket.gethostname()

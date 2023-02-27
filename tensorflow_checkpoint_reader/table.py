@@ -2,10 +2,11 @@ from . import errors
 from . import core
 from . import file_system
 from . import iterator
-import struct
-from dataclasses import dataclass
+from . import coding
+from . import strings
 from enum import Enum
 from typing import NamedTuple
+import numpy as np
 
 # kTableMagicNumber was picked by running
 #    echo http://code.google.com/p/leveldb/ | sha1sum
@@ -38,9 +39,27 @@ class BlockHandle:
   def offset(self) -> int:
     return self._offset
 
+  def set_offset(self, value: int):
+    self._offset = value
+
   @property
   def size(self) -> int:
     return self._size
+
+  def set_size(self, value: int):
+    self._size = value
+
+  def encode_to(self):
+    # // Sanity check that all fields have been set
+    # assert(offset_ != ~static_cast<uint64>(0));
+    assert self._offset != ~np.uint64(0)
+    # assert(size_ != ~static_cast<uint64>(0));
+    assert self._size != ~np.uint64(0)
+    # core::PutVarint64(dst, offset_);
+    dst = coding.encode_varint64(self._offset)
+    # core::PutVarint64(dst, size_);
+    dst = dst + coding.encode_varint64(self._size)
+    return dst
 
   def decode_from(self, input: core.StringPiece):
     ok, self._offset = core.get_varint_64(input)
@@ -62,9 +81,34 @@ class Footer:
   def index_handle(self) -> BlockHandle:
     return self._index_handle
 
+  def set_index_handle(self, handle: BlockHandle):
+    self._index_handle = handle
+
   @property
   def metaindex_handle(self) -> BlockHandle:
     return self._metaindex_handle
+
+  def set_metaindex_handle(self, handle: BlockHandle):
+    self._metaindex_handle = handle
+
+  def encode_to(self):
+    ##ifndef NDEBUG
+    # const size_t original_size = dst->size();
+    ##endif
+    original_size = 0
+    # metaindex_handle_.EncodeTo(dst);
+    dst = self._metaindex_handle.encode_to()
+    # index_handle_.EncodeTo(dst);
+    dst = dst + self._index_handle.encode_to()
+    # dst->resize(2 * BlockHandle::kMaxEncodedLength);  // Padding
+    strings.resize(dst, 2 * BlockHandle.kMaxEncodedLength)  # Padding
+    # core::PutFixed32(dst, static_cast<uint32>(kTableMagicNumber & 0xffffffffu));
+    coding.put_fixed32(dst, kTableMagicNumber & 0xffffffff)
+    # core::PutFixed32(dst, static_cast<uint32>(kTableMagicNumber >> 32));
+    coding.put_fixed32(dst, kTableMagicNumber >> 32)
+    # assert(dst->size() == original_size + kEncodedLength);
+    assert len(dst) == original_size + self.kEncodedLength
+    return dst
 
   def decode_from(self, input: core.StringPiece):
     magic = core.decode_fixed_64(input.slice(), Footer.kEncodedLength - 8)
