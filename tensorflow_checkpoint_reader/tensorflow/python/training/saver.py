@@ -1944,7 +1944,7 @@ class SaverExt:
       if current_time >= self._next_checkpoint_time:
         self._next_checkpoint_time = current_time + (self._keep_checkpoint_every_n_hours * 3600)
         logging.info("Not removing checkpoint %s", ckpt)
-      else:
+      elif ckpt:
         logging.info("Removing checkpoint %s", ckpt)
         checkpoint_management.remove_checkpoint(self.get_path(ckpt))
       save_state(state, self.checkpoint_dir_)
