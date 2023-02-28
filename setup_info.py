@@ -39,8 +39,11 @@ base_kwargs = {k: v for k, v in base_kwargs.items() if v}
 
 # defaults
 
-package_dir = \
-{'': 'src'}
+if os.path.isdir(package):
+  package_dir = None
+else:
+  package_dir = \
+  {'': 'src'}
 
 packages = \
 [package]
