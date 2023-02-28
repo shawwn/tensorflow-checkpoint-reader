@@ -1945,9 +1945,9 @@ class SaverExt:
       assert ckpt != state.model_checkpoint_path
       if current_time >= self._next_checkpoint_time:
         self._next_checkpoint_time = current_time + (self._keep_checkpoint_every_n_hours * 3600)
-        logging.info("Not removing checkpoint %s", ckpt)
+        logging.info("Not removing checkpoint %s", self.get_path(ckpt))
       else:
-        logging.info("Removing checkpoint %s", ckpt)
+        logging.info("Removing checkpoint %s", self.get_path(ckpt))
         checkpoint_management.remove_checkpoint(self.get_path(ckpt))
       save_state(state, self.checkpoint_dir_)
     # Update counter.
