@@ -8,6 +8,8 @@ from . import errors
 
 from typing import Callable, List, Tuple, Optional, TYPE_CHECKING
 from multiprocessing.pool import ThreadPool
+import collections
+import threading
 
 if TYPE_CHECKING:
   from . import file_system
@@ -152,90 +154,127 @@ def get_matching_paths(fs: file_system.FileSystem, env: env.Env, pattern) -> Tup
   # // INVARIANT: If `{_, ix}` is in queue, then `ix < dirs.size() - 1`.
   # // INVARIANT: If `{_, ix}` is in queue, `IsGlobbingPattern(dirs[ix + 1])`.
   # std::deque<std::pair<string, int>> expand_queue;
+  expand_queue = collections.deque()
   # std::deque<std::pair<string, int>> next_expand_queue;
+  next_expand_queue = collections.deque()
   # expand_queue.emplace_back(dirs[matching_index - 1], matching_index - 1);
+  expand_queue.append((dirs[matching_index - 1], matching_index - 1))
   #
   # // Adding to `result` or `new_expand_queue` need to be protected by mutexes
   # // since there are multiple threads writing to these.
   # mutex result_mutex;
+  result_mutex = threading.RLock()
   # mutex queue_mutex;
+  queue_mutex = threading.RLock()
   #
   # while (!expand_queue.empty()) {
-  #   next_expand_queue.clear();
-  #
-  #   // The work item for every item in `expand_queue`.
-  #   // pattern, we process them in parallel.
-  #   auto handle_level = [&fs, &results, &dirs, &expand_queue,
-  #                        &next_expand_queue, &result_mutex,
-  #                        &queue_mutex](int i) {
-  #     // See invariants above, all of these are valid accesses.
-  #     const auto& queue_item = expand_queue.at(i);
-  #     const std::string& parent = queue_item.first;
-  #     const int index = queue_item.second + 1;
-  #     const std::string& match_pattern = dirs[index];
-  #
-  #     // Get all children of `parent`. If this fails, return early.
-  #     std::vector<std::string> children;
-  #     Status s = fs->GetChildren(parent, &children);
-  #     if (s.code() == tensorflow::error::PERMISSION_DENIED) {
-  #       return;
-  #     }
-  #
-  #     // Also return early if we don't have any children
-  #     if (children.empty()) {
-  #       return;
-  #     }
-  #
-  #     // Since we can get extremely many children here and on some filesystems
-  #     // `IsDirectory` is expensive, we process the children in parallel.
-  #     // We also check that children match the pattern in parallel, for speedup.
-  #     // We store the status of the match and `IsDirectory` in
-  #     // `children_status` array, one element for each children.
-  #     std::vector<Status> children_status(children.size());
-  #     auto handle_children = [&fs, &match_pattern, &parent, &children,
-  #                             &children_status](int j) {
-  #       const std::string path = io::JoinPath(parent, children[j]);
-  #       if (!fs->Match(path, match_pattern)) {
-  #         children_status[j] =
-  #             Status(tensorflow::error::CANCELLED, "Operation not needed");
-  #       } else {
-  #         children_status[j] = fs->IsDirectory(path);
-  #       }
-  #     };
-  #     ForEach(0, children.size(), handle_children);
-  #
-  #     // At this point, pairing `children` with `children_status` will tell us
-  #     // if a children:
-  #     //   * does not match the pattern
-  #     //   * matches the pattern and is a directory
-  #     //   * matches the pattern and is not a directory
-  #     // We fully ignore the first case.
-  #     // If we matched the last pattern (`index == dirs.size() - 1`) then all
-  #     // remaining children get added to the result.
-  #     // Otherwise, only the directories get added to the next queue.
-  #     for (size_t j = 0; j < children.size(); j++) {
-  #       if (children_status[j].code() == tensorflow::error::CANCELLED) {
-  #         continue;
-  #       }
-  #
-  #       const std::string path = io::JoinPath(parent, children[j]);
-  #       if (index == dirs.size() - 1) {
-  #         mutex_lock l(result_mutex);
-  #         results->emplace_back(path);
-  #       } else if (children_status[j].ok()) {
-  #         mutex_lock l(queue_mutex);
-  #         next_expand_queue.emplace_back(path, index);
-  #       }
-  #     }
-  #   };
-  #   ForEach(0, expand_queue.size(), handle_level);
-  #
-  #   // After evaluating one level, swap the "buffers"
-  #   std::swap(expand_queue, next_expand_queue);
+  while len(expand_queue) > 0:
+    # next_expand_queue.clear();
+    next_expand_queue.clear()
+    #
+    # // The work item for every item in `expand_queue`.
+    # // pattern, we process them in parallel.
+    # auto handle_level = [&fs, &results, &dirs, &expand_queue,
+    #                      &next_expand_queue, &result_mutex,
+    #                      &queue_mutex](int i) {
+    def handle_level(i):
+      # // See invariants above, all of these are valid accesses.
+      # const auto& queue_item = expand_queue.at(i);
+      queue_item = expand_queue[i]
+      # const std::string& parent = queue_item.first;
+      parent: bytes = queue_item[0]
+      # const int index = queue_item.second + 1;
+      index: int = queue_item[1] + 1
+      # const std::string& match_pattern = dirs[index];
+      match_pattern = dirs[index]
+      #
+      # // Get all children of `parent`. If this fails, return early.
+      # std::vector<std::string> children;
+      # Status s = fs->GetChildren(parent, &children);
+      s, children = fs.get_children(parent)
+      # if (s.code() == tensorflow::error::PERMISSION_DENIED) {
+      #   return;
+      # }
+      if errors.is_permission_denied(s):
+        return
+      #
+      # // Also return early if we don't have any children
+      # if (children.empty()) {
+      #   return;
+      # }
+      if len(children) <= 0:
+        return
+      #
+      # // Since we can get extremely many children here and on some filesystems
+      # // `IsDirectory` is expensive, we process the children in parallel.
+      # // We also check that children match the pattern in parallel, for speedup.
+      # // We store the status of the match and `IsDirectory` in
+      # // `children_status` array, one element for each children.
+      # std::vector<Status> children_status(children.size());
+      children_status = [errors.Status.OK() for _ in range(len(children))]
+      # auto handle_children = [&fs, &match_pattern, &parent, &children,
+      #                         &children_status](int j) {
+      def handle_children(j: int):
+        # const std::string path = io::JoinPath(parent, children[j]);
+        path = io.join_path(parent, children[j])
+        # if (!fs->Match(path, match_pattern)) {
+        if not fs.match(path, match_pattern):
+          # children_status[j] =
+          #     Status(tensorflow::error::CANCELLED, "Operation not needed");
+          children_status[j] = errors.Status(errors.error.CANCELLED, "Operation not needed")
+        # } else {
+        else:
+          # children_status[j] = fs->IsDirectory(path);
+          children_status[j] = fs.is_directory(path)
+        # }
+      # };
+      # ForEach(0, children.size(), handle_children);
+      for_each(0, len(children), handle_children)
+      #
+      # // At this point, pairing `children` with `children_status` will tell us
+      # // if a children:
+      # //   * does not match the pattern
+      # //   * matches the pattern and is a directory
+      # //   * matches the pattern and is not a directory
+      # // We fully ignore the first case.
+      # // If we matched the last pattern (`index == dirs.size() - 1`) then all
+      # // remaining children get added to the result.
+      # // Otherwise, only the directories get added to the next queue.
+      # for (size_t j = 0; j < children.size(); j++) {
+      for j in range(len(children)):
+        # if (children_status[j].code() == tensorflow::error::CANCELLED) {
+        #   continue;
+        # }
+        if children_status[j].code() == errors.error.CANCELLED:
+          continue
+        #
+        # const std::string path = io::JoinPath(parent, children[j]);
+        path = io.join_path(parent, children[j])
+        # if (index == dirs.size() - 1) {
+        if index == len(dirs) - 1:
+          # mutex_lock l(result_mutex);
+          with result_mutex:
+            # results->emplace_back(path);
+            results.append(path)
+        # } else if (children_status[j].ok()) {
+        elif children_status[j].ok():
+          # mutex_lock l(queue_mutex);
+          with queue_mutex:
+            # next_expand_queue.emplace_back(path, index);
+            next_expand_queue.append((path, index))
+        # }
+      # }
+    # };
+    # ForEach(0, expand_queue.size(), handle_level);
+    for_each(0, len(expand_queue), handle_level)
+    #
+    # // After evaluating one level, swap the "buffers"
+    # std::swap(expand_queue, next_expand_queue);
+    expand_queue, next_expand_queue = next_expand_queue, expand_queue
   # }
   #
   # return Status::OK();
-  raise NotImplementedError("file_system_helper.get_matching_paths for glob patterns")
+  return errors.Status.OK(), results
 # }
 
 

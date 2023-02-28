@@ -30,6 +30,7 @@ from google.protobuf import text_format
 # from tensorflow.core.protobuf import saver_pb2
 from ....pb.tensorflow.core.protobuf import saver_pb2
 # from tensorflow.python.eager import context
+from ..eager import context
 # from tensorflow.python.framework import errors
 from ..framework import errors
 # from tensorflow.python.framework import ops
@@ -285,8 +286,7 @@ def get_checkpoint_state(checkpoint_dir, latest_filename=None):
     # Check that the file exists before opening it to avoid
     # many lines of errors from colossus in the logs.
     if file_io.file_exists(coord_checkpoint_filename):
-      file_content = file_io.read_file_to_string(
-          coord_checkpoint_filename)
+      file_content = file_io.read_file_to_string(coord_checkpoint_filename)
       ckpt = CheckpointState()
       text_format.Merge(file_content, ckpt)
       if not ckpt.model_checkpoint_path:
@@ -313,6 +313,28 @@ def get_checkpoint_state(checkpoint_dir, latest_filename=None):
     if f:
       f.close()
   return ckpt
+
+def read_checkpoint_state(checkpoint_dir, latest_filename=None):
+  coord_checkpoint_filename = _GetCheckpointFilename(checkpoint_dir, latest_filename)
+  try:
+    # Check that the file exists before opening it to avoid
+    # many lines of errors from colossus in the logs.
+    if file_io.file_exists(coord_checkpoint_filename):
+      file_content = file_io.read_file_to_string(coord_checkpoint_filename)
+      ckpt = CheckpointState()
+      text_format.Merge(file_content, ckpt)
+      if not ckpt.model_checkpoint_path:
+        raise ValueError("Invalid checkpoint state loaded from " + checkpoint_dir)
+      return ckpt
+  except errors.OpError as e:
+    # It's ok if the file cannot be read
+    logging.warning("%s: %s", type(e).__name__, e)
+    logging.warning("%s: Checkpoint ignored", coord_checkpoint_filename)
+    return None
+  except text_format.ParseError as e:
+    logging.warning("%s: %s", type(e).__name__, e)
+    logging.warning("%s: Checkpoint ignored", coord_checkpoint_filename)
+    return None
 
 
 def _prefix_to_checkpoint_path(prefix, format_version):

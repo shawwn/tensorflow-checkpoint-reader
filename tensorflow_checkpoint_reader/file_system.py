@@ -122,7 +122,7 @@ class FileSystem(ABC):
   def match(self, filename, pattern):
     filename = core.string_view(filename)
     pattern = core.string_view(pattern)
-    return fnmatch(filename.slice(), pattern.slice())
+    return fnmatch(filename.bytes(), pattern.bytes())
 
   def translate_name(self, name) -> bytes:
     name = core.string_view(name)

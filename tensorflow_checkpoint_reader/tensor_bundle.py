@@ -11,6 +11,7 @@ from . import random
 from . import port
 from . import table_options
 from . import table_builder
+from .tensorflow.python.platform import tf_logging as logging
 from .pb.tensorflow.core.protobuf import tensor_bundle_pb2
 from .pb.tensorflow.core.framework import types_pb2
 
@@ -227,7 +228,7 @@ class BundleWriter:
     self._out = FileOutputBuffer(wrapper, 8 << 20) # 8MB write buffer
 
     # VLOG(1) << "Writing to file " << data_path_;
-    print("Writing to file", self._data_path)
+    logging.info("Writing to file %s", self._data_path)
 
   # Status Add(StringPiece key, const Tensor& val);
   def add(self, key: core.StringPiece, val: tensor.Tensor):

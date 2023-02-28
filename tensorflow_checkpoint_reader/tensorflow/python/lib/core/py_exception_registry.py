@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import ClassVar, Dict, Any
-import collections.abc
+from typing import ClassVar, Dict, Any, Mapping
 
 # /* Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 #
@@ -166,7 +165,7 @@ class PyExceptionRegistry:
 
   # static void Init(PyObject* code_to_exc_type_map);
   @classmethod
-  def Init(cls, code_to_exc_type_map: collections.abc.Mapping):
+  def Init(cls, code_to_exc_type_map: Mapping):
     """Initializes the process-wide registry. Should be called exactly once near
     the beginning of the process. The arguments are the various Python
     exception types (e.g. `cancelled_exc` corresponds to

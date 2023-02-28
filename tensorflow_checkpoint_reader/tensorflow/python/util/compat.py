@@ -136,6 +136,8 @@ def as_str_any(value):
   Returns:
     A `str` object.
   """
+  if isinstance(value, (bytearray, memoryview)):
+    value = bytes(value)
   if isinstance(value, bytes):
     return as_str(value)
   else:

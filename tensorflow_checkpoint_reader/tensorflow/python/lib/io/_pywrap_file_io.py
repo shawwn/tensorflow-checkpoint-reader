@@ -233,6 +233,7 @@ def RenameFile(src, target, overwrite: bool):
 #         tensorflow::MaybeRaiseRegisteredFromStatusWithGIL(status);
 #       },
 #       py::arg("dirname"), py::arg("token") = (PyTransactionToken*)nullptr);
+
 #   m.def(
 #       "IsDirectory",
 #       [](const std::string& dirname, PyTransactionToken* token) {
@@ -247,6 +248,14 @@ def RenameFile(src, target, overwrite: bool):
 #         return true;
 #       },
 #       py::arg("dirname"), py::arg("token") = (PyTransactionToken*)nullptr);
+def IsDirectory(dirname):
+  status = env.Env.default().is_directory(dirname)
+  # FAILED_PRECONDITION response means path exists but isn't a dir.
+  if errors.is_failed_precondition(status):
+    return False
+  MaybeRaiseRegisteredFromStatusWithGIL(status)
+  return True
+
 #   m.def("HasAtomicMove", [](const std::string& path) {
 #     py::gil_scoped_release release;
 #     bool has_atomic_move;

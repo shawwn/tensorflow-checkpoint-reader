@@ -7,6 +7,7 @@ from . import tensor
 from . import tensor_shape
 from . import file_system
 from . import file_system_helper
+from .tensorflow.python.platform import tf_logging as logging
 from .pb.tensorflow.core.protobuf import tensor_bundle_pb2
 from .pb.tensorflow.core.framework import types_pb2
 
@@ -62,7 +63,7 @@ class BundleReader:
       iter2.next()
     # file_system_helper.for_each(0, len(self._tensors), lambda i: print(self._env.get_current_thread_id(), self._tensors[i][0], self._tensors[i][1].sum()))
     elapsed = time.time() - now
-    print('%0.2f msec' % (elapsed * 1000.0), file=sys.stderr)
+    logging.info('Read %s in %0.2f msec', self._prefix, (elapsed * 1000.0))
 
   def get_file(self, entry: tensor_bundle_pb2.BundleEntryProto) -> Tuple[errors.Status, Optional[file_system.RandomAccessFile]]:
     # Open the data file if it has not been opened.

@@ -23,9 +23,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections.abc
+import collections
 import os.path
 import time
+import re
+
+from typing import Mapping
 
 import numpy as np
 # from tensorflow.core.protobuf import meta_graph_pb2
@@ -623,6 +626,33 @@ def _get_saver_or_default():
     ops.add_to_collection(collection_key, saver)
   return saver
 
+def get_mtime(path):
+  try:
+    mtime = checkpoint_management.get_checkpoint_mtimes([path])
+    if mtime:
+      return mtime[0]
+  except errors.NotFoundError:
+    # It's fine if some other thread/process is deleting some older
+    # checkpoint concurrently.
+    pass
+
+def recover_last_checkpoints(checkpoint_paths):
+  """Recovers the internal saver state after a crash.
+
+  This method is useful for recovering the "self._last_checkpoints" state.
+
+  Globs for the checkpoints pointed to by `checkpoint_paths`.  If the files
+  exist, use their mtime as the checkpoint timestamp.
+
+  Args:
+    checkpoint_paths: a list of checkpoint paths.
+  """
+  checkpoints_with_mtimes = []
+  for checkpoint_path in checkpoint_paths:
+    mtime = get_mtime(checkpoint_path)
+    if mtime is not None:
+      checkpoints_with_mtimes.append((checkpoint_path, mtime))
+  return checkpoints_with_mtimes
 
 @tf_export(v1=["train.Saver"])
 class Saver(object):
@@ -1086,16 +1116,7 @@ class Saver(object):
     Args:
       checkpoint_paths: a list of checkpoint paths.
     """
-    checkpoints_with_mtimes = []
-    for checkpoint_path in checkpoint_paths:
-      try:
-        mtime = checkpoint_management.get_checkpoint_mtimes([checkpoint_path])
-      except errors.NotFoundError:
-        # It's fine if some other thread/process is deleting some older
-        # checkpoint concurrently.
-        continue
-      if mtime:
-        checkpoints_with_mtimes.append((checkpoint_path, mtime[0]))
+    checkpoints_with_mtimes = recover_last_checkpoints(checkpoint_paths)
     self.set_last_checkpoints_with_time(checkpoints_with_mtimes)
 
   def save(self,
@@ -1754,13 +1775,16 @@ def _wrap_restore_error_with_msg(err, extra_verbiage):
 def latest_checkpoint(checkpoint_dir, latest_filename=None):
   return checkpoint_management.latest_checkpoint(checkpoint_dir, latest_filename=latest_filename)
 
-def restore(checkpoint_dir, var_list: collections.abc.Mapping = None):
-  from .... import py_checkpoint_reader
-  state = checkpoint_management.get_checkpoint_state(checkpoint_dir)
+def restore(checkpoint_dir, var_list: Mapping = None, latest_filename=None):
+  state = checkpoint_management.get_checkpoint_state(checkpoint_dir, latest_filename=latest_filename)
   if state is None:
     raise errors.NotFoundError(None, None, "checkpoint not found", dict(checkpoint_dir=checkpoint_dir))
   ckpt = state.model_checkpoint_path
   # ckpt = checkpoint_management.latest_checkpoint(checkpoint_dir)
+  return load(ckpt, var_list)
+
+def load(ckpt, var_list: Mapping = None):
+  from .... import py_checkpoint_reader
   reader = py_checkpoint_reader.NewCheckpointReader(ckpt)
   if var_list is None:
     var_list = {name: None for name in reader.get_variable_to_shape_map().keys()}
@@ -1778,19 +1802,153 @@ def restore(checkpoint_dir, var_list: collections.abc.Mapping = None):
     out[name] = tensor
   return out
 
-def save(checkpoint_dir, var_list: collections.abc.Mapping, filename="model.ckpt", checkpoint_filename="checkpoint"):
+def save(checkpoint_dir, var_list: Mapping, filename="model.ckpt", latest_filename=None, state=None):
   from .... import tensor_bundle
   from .... import env
-  writer = tensor_bundle.BundleWriter(env.Env.default(), os.path.join(checkpoint_dir, filename))
-  for name, value in sorted(var_list.items()):
+  writer = tensor_bundle.BundleWriter(env.Env.default(), checkpoint_management._GetCheckpointFilename(checkpoint_dir, filename))
+  for name, value in sorted(var_list.items()): # It's important to sort the keys alphabetically, otherwise BundleWriter.add will error
     arr = np.asarray(value)
     writer.add(name, arr)
   writer.finish()
-  state = checkpoint_management.CheckpointState()
-  state.model_checkpoint_path = filename
-  state.all_model_checkpoint_paths.append(state.model_checkpoint_path)
+  if state is None:
+    state = checkpoint_management.CheckpointState()
+    state.model_checkpoint_path = filename
+    state.all_model_checkpoint_paths.append(state.model_checkpoint_path)
+  save_state(state, checkpoint_dir, latest_filename=latest_filename)
+  return state
+
+def save_state(state, checkpoint_dir, latest_filename=None):
   data = checkpoint_management.text_format.MessageToString(state)
-  checkpoint_fpath = os.path.join(checkpoint_dir, checkpoint_filename)
+  checkpoint_fpath = checkpoint_management._GetCheckpointFilename(checkpoint_dir, latest_filename)
   checkpoint_management.file_io.atomic_write_string_to_file(checkpoint_fpath, data)
 
+def checkpoint_step_from_filename(filename):
+  filename = compat.as_bytes(filename)
+  m = re.match(b'(?:.*[/\\\\])?[^/\\\\]+-([0-9]+)(?:[.][^/\\\\]+)?$', filename)
+  if m is not None:
+    return int(m.group(1))
 
+def checkpoint_step(checkpoint_dir, latest_filename=None):
+  state = checkpoint_management.get_checkpoint_state(checkpoint_dir, latest_filename=latest_filename)
+  if state is not None:
+    step = checkpoint_step_from_filename(state.model_checkpoint_path)
+    if step is not None:
+      return step
+  try:
+    return int(read_file_to_string(os.path.join(checkpoint_dir, 'counter')))
+  except (TypeError, ValueError):
+    pass
+
+def read_file_to_string(filename, binary_mode=False):
+  try:
+    return checkpoint_management.file_io.read_file_to_string(filename, binary_mode=binary_mode)
+  except checkpoint_management.errors.NotFoundError:
+    pass
+
+def checkpoint_state(checkpoint_dir, latest_filename=None):
+  state = checkpoint_management.get_checkpoint_state(checkpoint_dir, latest_filename=latest_filename)
+  if state is not None:
+    return recover_last_checkpoints(state.all_model_checkpoint_paths)
+
+def checkpoint_mtime(checkpoint_dir, latest_filename=None):
+  state = checkpoint_management.get_checkpoint_state(checkpoint_dir, latest_filename=latest_filename)
+  mtime = None
+  if state is not None and state.model_checkpoint_path:
+    mtime = get_mtime(state.model_checkpoint_path)
+  if mtime is None:
+    mtime = time.time()
+  else:
+    print('found mtime')
+  return mtime
+
+def build_saver_def(max_to_keep=None, keep_checkpoint_every_n_hours=None, sharded=False, write_version=saver_pb2.SaverDef.V2):
+  filename_tensor_name = ""
+  save_tensor_name = ""
+  return saver_pb2.SaverDef(
+    filename_tensor_name=filename_tensor_name,
+    save_tensor_name=save_tensor_name,
+    restore_op_name="",
+    max_to_keep=max_to_keep,
+    sharded=sharded,
+    keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours,
+    version=write_version)
+
+class SaverExt:
+  def __init__(self, checkpoint_dir, filename="model-{}.ckpt",
+               max_to_keep=5,
+               keep_checkpoint_every_n_hours=10000.0):
+    self.checkpoint_dir_ = checkpoint_dir
+    self.filename_ = filename
+    self._max_to_keep = max_to_keep
+    self._keep_checkpoint_every_n_hours = keep_checkpoint_every_n_hours
+    mtime = checkpoint_mtime(checkpoint_dir)
+    self._next_checkpoint_time = (mtime + self._keep_checkpoint_every_n_hours * 3600)
+    self.saver_def_ = build_saver_def(max_to_keep=max_to_keep, keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
+
+  def get_step(self, step: int = None):
+    if step is None:
+      step = checkpoint_step(compat.as_str(self.checkpoint_dir_))
+    if step is not None:
+      return step
+    return 0
+
+  def get_filename(self, global_step: int = None):
+    global_step = self.get_step(global_step)
+    filename: str = compat.as_str(self.filename_)
+    if '{' in filename:
+      filename = filename.format(int(global_step))
+    return filename
+
+  def get_checkpoint_path(self, checkpoint_path_or_global_step = None, relative = False):
+    ckpt = checkpoint_path_or_global_step
+    if ckpt is None:
+      ckpt = self.checkpoint_dir_
+    if isinstance(ckpt, int):
+      ckpt = checkpoint_management._GetCheckpointFilename(self.checkpoint_dir_, self.get_filename(ckpt))
+    if checkpoint_management.file_io.is_directory(ckpt):
+      ckpt = latest_checkpoint(ckpt)
+    if relative:
+      ckpt = os.path.relpath(ckpt, self.checkpoint_dir_)
+    return ckpt
+
+  def get_next_checkpoint_state(self, checkpoint_path_or_global_step = None):
+    filename = self.get_checkpoint_path(checkpoint_path_or_global_step, relative=True)
+    state = checkpoint_management.read_checkpoint_state(self.checkpoint_dir_)
+    if state is None:
+      state = checkpoint_management.CheckpointState()
+      state.all_model_checkpoint_paths.append(state.model_checkpoint_path)
+    if filename not in state.all_model_checkpoint_paths:
+      state.all_model_checkpoint_paths.append(filename)
+    state.model_checkpoint_path = filename
+    return state
+
+  def get_path(self, path):
+    return checkpoint_management._GetCheckpointFilename(self.checkpoint_dir_, path)
+
+  def load(self, var_list: Mapping = None, checkpoint_path = None):
+    checkpoint_path = self.get_checkpoint_path(checkpoint_path)
+    if checkpoint_path is not None:
+      return load(checkpoint_path, var_list)
+
+  def save(self, var_list: Mapping, global_step: int = None):
+    global_step = self.get_step(global_step)
+    filename = self.get_filename(global_step)
+    state = self.get_next_checkpoint_state(global_step)
+    # Save new checkpoint.
+    save(self.checkpoint_dir_, var_list, filename, state=state)
+    # Prune old checkpoints.
+    current_time = time.time() - 1
+    while len(state.all_model_checkpoint_paths) > self._max_to_keep and len(state.all_model_checkpoint_paths) > 1:
+      ckpt = state.all_model_checkpoint_paths.pop(0)
+      assert ckpt != state.model_checkpoint_path
+      if current_time >= self._next_checkpoint_time:
+        self._next_checkpoint_time = current_time + (self._keep_checkpoint_every_n_hours * 3600)
+        logging.info("Not removing checkpoint %s", ckpt)
+      else:
+        logging.info("Removing checkpoint %s", ckpt)
+        checkpoint_management.remove_checkpoint(self.get_path(ckpt))
+      save_state(state, self.checkpoint_dir_)
+    # Update counter.
+    assert isinstance(global_step, int)
+    counter_fpath = self.get_path("counter")
+    checkpoint_management.file_io.atomic_write_string_to_file(counter_fpath, str(global_step))

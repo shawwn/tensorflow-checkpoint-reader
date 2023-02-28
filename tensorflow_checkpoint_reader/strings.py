@@ -23,7 +23,14 @@ def resize(s: bytearray, size: int):
     s.extend(bytearray(size - len(s)))
 
 def str_cat(*args):
-  return ''.join([x.decode('utf-8') if hasattr(x, 'decode') else str(x) for x in args])
+  s = []
+  for arg in args:
+    if isinstance(arg, str):
+      s.append(arg)
+    else:
+      arg = bytes(arg)
+      s.append(arg.decode('utf-8'))
+  return ''.join(s)
 
 def printf(format, *args) -> bytes:
   format = core.string_view(format).bytes()

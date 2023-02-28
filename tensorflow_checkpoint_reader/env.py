@@ -188,6 +188,21 @@ class Env(ABC):
       return err
     return fs.file_exists(fname)
 
+  def is_directory(self, name) -> errors.Status:
+    """Returns whether the given path is a directory or not.
+
+    Typical return codes (not guaranteed exhaustive):
+     * OK - The path exists and is a directory.
+     * FAILED_PRECONDITION - The path exists and is not a directory.
+     * NOT_FOUND - The path entry does not exist.
+     * PERMISSION_DENIED - Insufficient permissions.
+     * UNIMPLEMENTED - The file factory doesn't support directories.
+    """
+    err, fs = self.get_file_system_for_file(name)
+    if not err.ok():
+      return err
+    return fs.is_directory(name)
+
   # virtual Status GetMatchingPaths(const std::string& pattern,
   #                                 std::vector<string>* results);
   def get_matching_paths(self, pattern) -> Tuple[errors.Status, Optional[List]]:
