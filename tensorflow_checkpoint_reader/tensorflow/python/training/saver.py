@@ -1855,10 +1855,8 @@ def checkpoint_mtime(checkpoint_dir, latest_filename=None):
   mtime = None
   if state is not None and state.model_checkpoint_path:
     mtime = get_mtime(state.model_checkpoint_path)
-  if mtime is None:
-    mtime = time.time()
-  else:
-    print('found mtime')
+  if mtime is not None:
+    logging.info("Found mtime for %s", state.model_checkpoint_path)
   return mtime
 
 def build_saver_def(max_to_keep=None, keep_checkpoint_every_n_hours=None, sharded=False, write_version=saver_pb2.SaverDef.V2):
@@ -1876,12 +1874,16 @@ def build_saver_def(max_to_keep=None, keep_checkpoint_every_n_hours=None, sharde
 class SaverExt:
   def __init__(self, checkpoint_dir, filename="model-{}.ckpt",
                max_to_keep=5,
-               keep_checkpoint_every_n_hours=10000.0):
+               keep_checkpoint_every_n_hours=10000.0,
+               keep_first_checkpoint=True):
     self.checkpoint_dir_ = checkpoint_dir
     self.filename_ = filename
     self._max_to_keep = max_to_keep
     self._keep_checkpoint_every_n_hours = keep_checkpoint_every_n_hours
+    self._keep_first_checkpoint = keep_first_checkpoint
     mtime = checkpoint_mtime(checkpoint_dir)
+    if mtime is None:
+      mtime = 0.0 if keep_first_checkpoint else time.time()
     self._next_checkpoint_time = (mtime + self._keep_checkpoint_every_n_hours * 3600)
     self.saver_def_ = build_saver_def(max_to_keep=max_to_keep, keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
 
