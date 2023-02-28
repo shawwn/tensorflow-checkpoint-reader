@@ -1918,7 +1918,6 @@ class SaverExt:
     state = checkpoint_management.read_checkpoint_state(self.checkpoint_dir_)
     if state is None:
       state = checkpoint_management.CheckpointState()
-      state.all_model_checkpoint_paths.append(state.model_checkpoint_path)
     if filename not in state.all_model_checkpoint_paths:
       state.all_model_checkpoint_paths.append(filename)
     state.model_checkpoint_path = filename
@@ -1942,11 +1941,12 @@ class SaverExt:
     current_time = time.time() - 1
     while len(state.all_model_checkpoint_paths) > self._max_to_keep and len(state.all_model_checkpoint_paths) > 1:
       ckpt = state.all_model_checkpoint_paths.pop(0)
+      assert ckpt
       assert ckpt != state.model_checkpoint_path
       if current_time >= self._next_checkpoint_time:
         self._next_checkpoint_time = current_time + (self._keep_checkpoint_every_n_hours * 3600)
         logging.info("Not removing checkpoint %s", ckpt)
-      elif ckpt:
+      else:
         logging.info("Removing checkpoint %s", ckpt)
         checkpoint_management.remove_checkpoint(self.get_path(ckpt))
       save_state(state, self.checkpoint_dir_)
